@@ -904,11 +904,6 @@ All tabs edit the same store through `updateSections` and autosave like the canv
 
 ## 15. Phases (do them in order; each ends with `npm run verify && npm run test:e2e` green, the Compose stack healthy, and a commit)
 
-### Phase 2: Persistence and REST (≈ 2 days)
-- [ ] `errors.ts`, `http.ts`, full `projects.ts`, `versions.ts`, `status.ts` (§8.2) and the routes (§10).
-- [ ] **Tests:** the §8.2 list, plus `tests/rest.integration.test.ts`.
-- **Accept:** `npm run test:integration` is green. `curl -X PUT` with a stale revision returns 409.
-
 ### Phase 3: MCP server (≈ 2 days)
 - [ ] `context.ts`, `tools/*.ts` (12 tools), `prompts.ts`, `resources.ts`, then rewrite `server.ts` to register them (keep `createDesignMcpServer`'s signature and the server instructions, updated to mention `get_project_brief` and the `implement_design` prompt).
 - [ ] Update the VERIFIED `tests/mcp.integration.test.ts` expectation for the tool list to all 12 names. Add `tests/mcp-tools.integration.test.ts` (§9.6).
