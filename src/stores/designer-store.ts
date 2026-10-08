@@ -10,9 +10,16 @@ import { temporal } from "zundo";
 import { createStore } from "zustand/vanilla";
 
 import { allowedEdgeKinds, NODE_KIND_META } from "@/lib/design/catalog";
+import {
+  removeChannel,
+  removeField,
+  removeOperation,
+  renameField,
+  scrubEntityRefs,
+} from "@/lib/design/edits";
 import { reparentNode, subtreeIds, type Point } from "@/lib/design/geometry";
 import { newEdgeId, newNodeId } from "@/lib/design/ids";
-import { sortNodesParentFirst } from "@/lib/design/integrity";
+import { safeParseDesign, sortNodesParentFirst } from "@/lib/design/integrity";
 import {
   EdgeSchema,
   NodeSchema,
@@ -49,6 +56,11 @@ export interface DesignerState {
   /** Removes nodes (with everything nested inside) and edges (plus edges of removed nodes). */
   removeElements(ids: { nodeIds?: string[]; edgeIds?: string[] }): void;
   updateSections(patch: Partial<Sections>): void;
+  /** Cross-reference-safe edits (each is one undo step): see lib/design/edits.ts. */
+  removeOperation(apiId: string, operationId: string): void;
+  removeChannel(queueId: string, channelId: string): void;
+  renameField(entityId: string, from: string, to: string): void;
+  removeField(entityId: string, name: string): void;
   /** Replace the draft wholesale (restore a version, reload after a conflict). */
   replaceDocument(document: DesignDocument, revision?: number): void;
 
@@ -63,13 +75,24 @@ export function createDesignerStore(init: {
   slug: string;
   document: DesignDocument;
   revision: number;
+  /**
+   * Called when an edit would make the document invalid (schema or integrity errors).
+   * The edit is discarded: the server would reject the save, so it must never be stored.
+   */
+  onReject?: (message: string) => void;
 }) {
   return createStore<DesignerState>()(
     temporal(
       (set, get) => {
         const mutate = (fn: (doc: DesignDocument) => DesignDocument) => {
           const next = fn(get().document);
-          if (next !== get().document) set({ document: next });
+          if (next === get().document) return;
+          const check = safeParseDesign(next);
+          if (!check.ok) {
+            init.onReject?.(check.issues[0]?.message ?? "That change is not valid");
+            return;
+          }
+          set({ document: next });
         };
         const mapNode = (doc: DesignDocument, id: string, fn: (n: DesignNode) => DesignNode) => ({
           ...doc,
@@ -151,21 +174,43 @@ export function createDesignerStore(init: {
               const doomedEdges = new Set(edgeIds);
               if (doomed.size === 0 && doomedEdges.size === 0) return doc;
               const keepId = (id: string) => !doomed.has(id);
-              return {
-                ...doc,
-                nodes: doc.nodes.filter((n) => keepId(n.id)),
-                edges: doc.edges.filter(
-                  (e) => !doomedEdges.has(e.id) && keepId(e.source) && keepId(e.target),
-                ),
-                // Scopes must not point at deleted nodes (integrity rule scope.unknown_node).
-                stack: doc.stack.map((s) => ({ ...s, scope: s.scope.filter(keepId) })),
-                conventions: doc.conventions.map((c) => ({ ...c, scope: c.scope.filter(keepId) })),
-              };
+              const entities = new Set(
+                doc.nodes.filter((n) => doomed.has(n.id) && n.kind === "entity").map((n) => n.id),
+              );
+              return scrubEntityRefs(
+                {
+                  ...doc,
+                  nodes: doc.nodes.filter((n) => keepId(n.id)),
+                  edges: doc.edges.filter(
+                    (e) => !doomedEdges.has(e.id) && keepId(e.source) && keepId(e.target),
+                  ),
+                  // Scopes must not point at deleted nodes (integrity rule scope.unknown_node).
+                  stack: doc.stack.map((s) => ({ ...s, scope: s.scope.filter(keepId) })),
+                  conventions: doc.conventions.map((c) => ({
+                    ...c,
+                    scope: c.scope.filter(keepId),
+                  })),
+                },
+                entities,
+              );
             });
           },
 
           updateSections(patch) {
             mutate((doc) => ({ ...doc, ...patch }));
+          },
+
+          removeOperation(apiId, operationId) {
+            mutate((doc) => removeOperation(doc, apiId, operationId));
+          },
+          removeChannel(queueId, channelId) {
+            mutate((doc) => removeChannel(doc, queueId, channelId));
+          },
+          renameField(entityId, from, to) {
+            mutate((doc) => renameField(doc, entityId, from, to));
+          },
+          removeField(entityId, name) {
+            mutate((doc) => removeField(doc, entityId, name));
           },
 
           replaceDocument(document, revision) {

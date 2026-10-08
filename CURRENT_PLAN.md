@@ -904,20 +904,6 @@ All tabs edit the same store through `updateSections` and autosave like the canv
 
 ## 15. Phases (do them in order; each ends with `npm run verify && npm run test:e2e` green, the Compose stack healthy, and a commit)
 
-### Phase 5: Designer (≈ 4 days)
-- [ ] The project layout (§11.5), store provider, autosave (§12), canvas (§11.6), inspector (§11.7), selection and status stores, `to-flow.ts` (+ unit tests). Replace the prototype `canvas.tsx` and `projects/[slug]/page.tsx`.
-- [ ] **e2e** `e2e/designer.spec.ts`:
-  - drag a Service from the palette and rename it in the inspector;
-  - drag a Layer into it (the layer's parent is the service after reload);
-  - add a Module into the layer;
-  - connect module → a new API (gets `calls`);
-  - add an entity field;
-  - undo/redo;
-  - reload → everything persisted;
-  - open the same project in a second page, edit both → the second save shows the conflict dialog;
-  - delete a container → its children are gone.
-- **Accept:** with the example, all of the above works by hand. Dragging is smooth with 300 nodes (generate a synthetic document in a test helper and open it). No console errors (the smoke test asserts this).
-
 ### Phase 6: Sections, brief, versions, status badges (≈ 2 days)
 - [ ] The section tabs (§11.8), publish/restore actions, status polling and badges, and the header Export/Connect menus.
 - [ ] **e2e** `e2e/agent-flow.spec.ts`:

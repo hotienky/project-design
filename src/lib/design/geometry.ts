@@ -56,18 +56,20 @@ export function subtreeIds(doc: DesignDocument, id: string): Set<string> {
 }
 
 /**
- * The container a node dropped with its centre at `center` belongs in: the
- * smallest allowed container whose rect contains the point (never itself or a
- * descendant). null = top level, or no allowed container under the point.
+ * The smallest container of the right kind whose rect contains `center`, ignoring
+ * `excluded` ids. Used for nodes that already exist (drag) and for nodes about to
+ * be created (palette drop). null = top level, or no allowed container under the point.
  */
-export function findDropParent(doc: DesignDocument, nodeId: string, center: Point): string | null {
-  const node = doc.nodes.find((n) => n.id === nodeId);
-  if (!node) return null;
-  const excluded = subtreeIds(doc, nodeId);
+export function findContainerFor(
+  doc: DesignDocument,
+  kind: DesignNode["kind"],
+  center: Point,
+  excluded: ReadonlySet<string> = new Set(),
+): string | null {
   let best: { id: string; area: number } | null = null;
   for (const c of doc.nodes) {
     if (excluded.has(c.id) || !NODE_KIND_META[c.kind].container) continue;
-    if (!canContain(c.kind, node.kind)) continue;
+    if (!canContain(c.kind, kind)) continue;
     const r = absoluteRect(doc, c.id);
     const inside =
       center.x >= r.x && center.x <= r.x + r.width && center.y >= r.y && center.y <= r.y + r.height;
@@ -76,6 +78,17 @@ export function findDropParent(doc: DesignDocument, nodeId: string, center: Poin
     }
   }
   return best?.id ?? null;
+}
+
+/**
+ * The container a node dropped with its centre at `center` belongs in: the
+ * smallest allowed container whose rect contains the point (never itself or a
+ * descendant). null = top level, or no allowed container under the point.
+ */
+export function findDropParent(doc: DesignDocument, nodeId: string, center: Point): string | null {
+  const node = doc.nodes.find((n) => n.id === nodeId);
+  if (!node) return null;
+  return findContainerFor(doc, node.kind, center, subtreeIds(doc, nodeId));
 }
 
 /** Moves a node under a new parent (or to the top level) without moving it on screen. */

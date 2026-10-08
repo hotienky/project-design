@@ -61,4 +61,53 @@ describe("designer store", () => {
     expect(store.getState().revision).toBe(4);
     expect(isDirty(store.getState())).toBe(true); // a newer edit is still pending
   });
+
+  it("discards an edit that would make the document invalid and reports why", () => {
+    const rejected: string[] = [];
+    const store = createDesignerStore({
+      slug: "x",
+      document: parseDesign(teamTasksDesign),
+      revision: 1,
+      onReject: (m) => rejected.push(m),
+    });
+    const before = store.getState().document;
+    // Two fields with the same name are an integrity error the server would refuse.
+    store
+      .getState()
+      .updateNode("ent_task", (n) =>
+        n.kind === "entity"
+          ? { ...n, data: { ...n.data, fields: [...n.data.fields, { ...n.data.fields[0]! }] } }
+          : n,
+      );
+    expect(store.getState().document).toBe(before);
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]).toContain("duplicate field");
+    expect(isDirty(store.getState())).toBe(false);
+  });
+
+  it("keeps references valid when operations, channels, fields and entities go away", () => {
+    const store = make();
+    store.getState().removeOperation("api_rest", "op_create");
+    store.getState().removeChannel("que_events", "ch_assigned");
+    store.getState().renameField("ent_task", "status", "state");
+    store.getState().removeField("ent_task", "projectId");
+    expect(checkIntegrity(store.getState().document)).toEqual([]);
+
+    store.getState().removeElements({ nodeIds: ["ent_task"] });
+    const doc = store.getState().document;
+    const api = doc.nodes.find((n) => n.id === "api_rest");
+    expect(api?.kind === "api" && api.data.operations.map((o) => o.response?.entityId)).toEqual([
+      null,
+      null,
+    ]);
+    expect(checkIntegrity(doc)).toEqual([]);
+  });
+
+  it("makes each cross-reference edit a single undo step", () => {
+    const store = make();
+    const original = store.getState().document;
+    store.getState().removeOperation("api_rest", "op_create");
+    store.temporal.getState().undo();
+    expect(store.getState().document).toBe(original);
+  });
 });
