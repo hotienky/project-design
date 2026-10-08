@@ -17,7 +17,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env src/server/db/migrate-cli.ts",
     "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:all && npm run build",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "docs:screenshot": "SCREENSHOT=1 playwright test e2e/screenshot.spec.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.3.1",
