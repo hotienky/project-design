@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { keepMeasured, toFlowEdges, toFlowNodes } from "@/components/designer/to-flow";
+import { keepMeasured, toFlowEdges, toFlowNodes, Z } from "@/components/designer/to-flow";
 import { teamTasksDesign } from "@/lib/design/examples/team-tasks";
 import { parseDesign } from "@/lib/design/integrity";
 import { levelView } from "@/lib/design/levels";
@@ -25,7 +25,17 @@ describe("toFlowNodes", () => {
     expect(routes.width).toBeUndefined();
     expect(routes.parentId).toBe("lyr_http");
     expect(routes.position).toEqual({ x: 20, y: 20 });
-    expect(routes.zIndex).toBe(1);
+    expect(routes.zIndex).toBe(Z.card);
+  });
+
+  it("stacks containers by depth, then edges, then cards", () => {
+    const z = (id: string) => nodes.find((n) => n.id === id)!.zIndex!;
+    expect([z("svc_api"), z("lyr_http")]).toEqual([0, 1]);
+    expect(z("lyr_http")).toBeLessThan(Z.edge);
+    expect(toFlowEdges(doc, new Set()).every((e) => e.zIndex === Z.edge)).toBe(true);
+    expect(Z.edge).toBeLessThan(Z.label);
+    expect(Z.label).toBeLessThan(z("mod_routes"));
+    expect(z("mod_repo")).toBe(Z.selectedCard);
   });
 
   it("marks the selection and attaches statuses", () => {

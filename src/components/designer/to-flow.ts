@@ -24,6 +24,22 @@ export type FlowEdgeData = {
 };
 export type FlowEdge = Edge<FlowEdgeData>;
 
+/**
+ * Stacking order (the canvas runs React Flow with zIndexMode="manual"): containers by nesting
+ * depth, then edges, then edge labels, then cards. Lines and pills pass behind cards instead of
+ * across them, yet stay above the container backgrounds they cross.
+ */
+export const Z = { edge: 10, label: 15, card: 20, selectedCard: 21 } as const;
+
+const cardZ = (selected: boolean) => (selected ? Z.selectedCard : Z.card);
+
+/** Nesting depth of each node in a parents-first list (top level = 0). */
+function depths(nodes: { id: string; parentId: string | null }[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const n of nodes) out.set(n.id, n.parentId ? (out.get(n.parentId) ?? 0) + 1 : 0);
+  return out;
+}
+
 export function toFlowNodes(
   doc: DesignDocument,
   statuses: Record<string, { status: ComponentStatus; note: string }>,
@@ -32,6 +48,7 @@ export function toFlowNodes(
 ): FlowNode[] {
   if (view) return levelNodes(view, statuses, selected);
   // doc.nodes is stored parents-first, which React Flow requires.
+  const depth = depths(doc.nodes);
   return doc.nodes.map((n) => {
     const container = NODE_KIND_META[n.kind].container;
     const status = statuses[n.id] ?? null;
@@ -43,7 +60,7 @@ export function toFlowNodes(
       data: { node: n, status },
       ...(container ? { width: nodeSize(n).width, height: nodeSize(n).height } : {}),
       selected: selected.has(n.id),
-      zIndex: container ? 0 : 1,
+      zIndex: container ? depth.get(n.id)! : cardZ(selected.has(n.id)),
     };
   });
 }
@@ -53,6 +70,7 @@ function levelNodes(
   statuses: Record<string, { status: ComponentStatus; note: string }>,
   selected: ReadonlySet<string>,
 ): FlowNode[] {
+  const depth = depths(view.inside.map((i) => ({ id: i.node.id, parentId: i.parentId })));
   const inside = view.inside.map(({ node: n, parentId, position, collapsed }): FlowNode => {
     const status = statuses[n.id] ?? null;
     if (collapsed !== null) {
@@ -62,7 +80,7 @@ function levelNodes(
         position,
         data: { node: n, status, collapsed },
         selected: selected.has(n.id),
-        zIndex: 1,
+        zIndex: cardZ(selected.has(n.id)),
       };
     }
     const container = NODE_KIND_META[n.kind].container;
@@ -76,7 +94,7 @@ function levelNodes(
       data: { node: n, status },
       ...(container ? { width: nodeSize(n).width, height: nodeSize(n).height } : {}),
       selected: selected.has(n.id),
-      zIndex: container ? 0 : 1,
+      zIndex: container ? depth.get(n.id)! : cardZ(selected.has(n.id)),
     };
   });
   const context = view.context.map(({ node: n, path, position }): FlowNode => ({
@@ -87,7 +105,7 @@ function levelNodes(
     selected: selected.has(n.id),
     draggable: false,
     deletable: false,
-    zIndex: 1,
+    zIndex: cardZ(selected.has(n.id)),
   }));
   return [...inside, ...context];
 }
@@ -138,7 +156,7 @@ export function toFlowEdges(
       animated: e.kind === "publishes" || e.kind === "subscribes",
       selected: !e.lifted && selected.has(e.id),
       ...(e.lifted ? { selectable: false, deletable: false } : {}),
-      zIndex: 2,
+      zIndex: Z.edge,
     }));
   }
   return doc.edges.map((e) => ({
@@ -149,7 +167,7 @@ export function toFlowEdges(
     data: { edge: e, caption: edgeCaption(e, nodes) },
     animated: e.kind === "publishes" || e.kind === "subscribes",
     selected: selected.has(e.id),
-    zIndex: 2,
+    zIndex: Z.edge,
   }));
 }
 

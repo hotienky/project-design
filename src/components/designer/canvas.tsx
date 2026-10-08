@@ -597,6 +597,7 @@ function Flow({ wide }: { wide: boolean }) {
             edges={shownEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
+            zIndexMode="manual"
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onNodeDragStop={onNodeDragStop}

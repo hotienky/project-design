@@ -10,7 +10,7 @@ import {
   type InternalNode,
 } from "@xyflow/react";
 
-import type { FlowEdge } from "@/components/designer/to-flow";
+import { Z, type FlowEdge } from "@/components/designer/to-flow";
 import type { EdgeKind } from "@/lib/design/schema";
 
 /** Each kind has its own colour; dashes tell structural, data and async links apart. */
@@ -132,6 +132,7 @@ export function DesignEdgeView({ id, source, target, data, selected }: EdgeProps
           className="nodrag nopan pointer-events-auto absolute rounded-full border bg-background px-2 py-0.5 text-[10px] leading-none font-medium shadow-xs"
           style={{
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            zIndex: Z.label,
             borderColor: stroke,
             color: `color-mix(in oklch, ${stroke} 70%, var(--foreground))`,
           }}
