@@ -22,7 +22,8 @@ const TITLES = { error: "Errors", warning: "Warnings", info: "Hints" } as const;
 export function ValidationPanel() {
   const document = useDesigner((s) => s.document);
   const actions = useCanvasActions();
-  const issues = useMemo(() => validateDesign(document), [document]);
+  const layout = useCanvasUi((s) => s.viewMode);
+  const issues = useMemo(() => validateDesign(document, { layout }), [document, layout]);
 
   function open(issue: Issue) {
     if (issue.nodeId) useSelection.getState().set([issue.nodeId], []);

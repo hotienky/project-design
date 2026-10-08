@@ -101,6 +101,11 @@ export function nodeSize(n: DesignNode): { width: number; height: number } {
   return { width: CARD.width, height: Math.ceil(height) };
 }
 
+/** A container collapsed to a levels-view summary card: title plus the "N inside" chip row. */
+export function summarySize(): { width: number; height: number } {
+  return { width: CARD.width, height: CARD.base + CARD.chips };
+}
+
 export function absolutePosition(doc: DesignDocument, id: string): Point {
   const byId = new Map(doc.nodes.map((n) => [n.id, n]));
   let x = 0;

@@ -33,6 +33,16 @@ describe("validateDesign", () => {
     ).toBe(false);
   });
 
+  it("measures top-level containers as summary cards in the levels layout", () => {
+    const doc = parseDesign(teamTasksDesign);
+    const api = doc.nodes.find((n) => n.id === "api_rest")!;
+    api.position = { x: 420, y: 200 }; // inside the 520×520 API service, below its card
+    const overlaps = (layout: "all" | "levels") =>
+      validateDesign(doc, { layout }).filter((i) => i.code === "layout.overlap");
+    expect(overlaps("all")).toEqual([expect.objectContaining({ nodeId: "api_rest" })]);
+    expect(overlaps("levels")).toEqual([]);
+  });
+
   it("sorts errors, then warnings, then info", () => {
     const doc = parseDesign(teamTasksDesign);
     const ent = doc.nodes.find((n) => n.id === "ent_task")!;

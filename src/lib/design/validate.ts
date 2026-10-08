@@ -1,12 +1,20 @@
 /** Quality checks on a design. Structural errors come from integrity.ts; this adds warnings and hints. */
-import { nodeSize } from "@/lib/design/geometry";
+import { NODE_KIND_META } from "@/lib/design/catalog";
+import { nodeSize, summarySize } from "@/lib/design/geometry";
 import { indexDesign, type DesignIndex } from "@/lib/design/graph";
 import { checkIntegrity, type Issue } from "@/lib/design/integrity";
 import type { DesignDocument, DesignEdge, DesignNode } from "@/lib/design/schema";
 
 const SEVERITY_ORDER = { error: 0, warning: 1, info: 2 } as const;
 
-export function validateDesign(doc: DesignDocument): Issue[] {
+/**
+ * `layout` is the canvas the overlap check measures: "all" draws containers at their stored size;
+ * "levels" collapses top-level containers to summary cards.
+ */
+export function validateDesign(
+  doc: DesignDocument,
+  { layout = "all" }: { layout?: "all" | "levels" } = {},
+): Issue[] {
   const issues: Issue[] = [...checkIntegrity(doc)];
   const index = indexDesign(doc);
   const add = (
@@ -28,7 +36,7 @@ export function validateDesign(doc: DesignDocument): Issue[] {
   checkApis(index, add);
   checkData(index, add);
   checkMessaging(index, add);
-  checkOverlaps(doc, add);
+  checkOverlaps(doc, layout, add);
 
   for (const n of doc.nodes) {
     if (n.kind === "integration" && index.incoming(n.id, "uses").length === 0) {
@@ -368,7 +376,11 @@ function checkMessaging(index: DesignIndex, add: Add) {
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Siblings (same container, positions in the same frame) whose boxes intersect hide each other on the canvas. */
-function checkOverlaps(doc: DesignDocument, add: Add) {
+function checkOverlaps(doc: DesignDocument, layout: "all" | "levels", add: Add) {
+  const size = (n: DesignNode) =>
+    layout === "levels" && n.parentId === null && NODE_KIND_META[n.kind].container
+      ? summarySize()
+      : nodeSize(n);
   const groups = new Map<string | null, DesignNode[]>();
   for (const n of doc.nodes) {
     const siblings = groups.get(n.parentId) ?? [];
@@ -376,7 +388,7 @@ function checkOverlaps(doc: DesignDocument, add: Add) {
     groups.set(n.parentId, siblings);
   }
   for (const siblings of groups.values()) {
-    const boxes = siblings.map((n) => ({ n, ...n.position, ...nodeSize(n) }));
+    const boxes = siblings.map((n) => ({ n, ...n.position, ...size(n) }));
     for (let i = 0; i < boxes.length; i++) {
       for (let j = 0; j < i; j++) {
         const a = boxes[i]!;

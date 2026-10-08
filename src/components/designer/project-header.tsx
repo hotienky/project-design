@@ -80,7 +80,8 @@ function ValidateButton() {
   const pathname = usePathname();
   const router = useRouter();
   const { slug } = useProjectMeta();
-  const issues = useMemo(() => validateDesign(document), [document]);
+  const layout = useCanvasUi((s) => s.viewMode);
+  const issues = useMemo(() => validateDesign(document, { layout }), [document, layout]);
   const errors = issues.filter((i) => i.severity === "error").length;
   const warnings = issues.filter((i) => i.severity === "warning").length;
   const count = errors || warnings;
