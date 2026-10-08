@@ -7,6 +7,8 @@ import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { renameProjectAction } from "@/app/actions/projects";
+import { ConnectDialog, ExportMenu } from "@/components/designer/header-menus";
+import { PublishDialog } from "@/components/designer/publish-dialog";
 import { SaveIndicator } from "@/components/designer/save-indicator";
 import { useDesigner, useProjectMeta } from "@/components/designer/store-provider";
 import { Button } from "@/components/ui/button";
@@ -14,7 +16,15 @@ import { Input } from "@/components/ui/input";
 import { validateDesign } from "@/lib/design/validate";
 import { useCanvasUi } from "@/stores/canvas-ui-store";
 
-const TABS = [{ segment: "", label: "Canvas" }] as const;
+const TABS = [
+  { segment: "", label: "Canvas" },
+  { segment: "overview", label: "Overview" },
+  { segment: "stack", label: "Stack" },
+  { segment: "conventions", label: "Conventions" },
+  { segment: "decisions", label: "Decisions" },
+  { segment: "brief", label: "Brief" },
+  { segment: "versions", label: "Versions" },
+] as const;
 
 function ProjectName() {
   const { name, slug } = useProjectMeta();
@@ -116,6 +126,9 @@ export function ProjectHeader() {
         <SaveIndicator />
         <div className="ml-auto flex items-center gap-2">
           <ValidateButton />
+          <PublishDialog />
+          <ExportMenu />
+          <ConnectDialog />
         </div>
       </div>
       <nav aria-label="Project sections" className="flex h-10 items-end gap-1 px-4">

@@ -116,7 +116,11 @@ export function TextField({
       {...shared}
       ref={inputRef}
       onChange={(e) => draft.setValue(e.target.value)}
-      onKeyDown={(e) => e.key === "Enter" && draft.flush()}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault(); // don't submit an enclosing dialog form with the not-yet-committed value
+        draft.flush();
+      }}
     />
   );
   if (compact) {

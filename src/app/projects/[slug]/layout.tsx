@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { DesignerStoreProvider } from "@/components/designer/store-provider";
 import { ProjectHeader } from "@/components/designer/project-header";
 import { getDb } from "@/server/db/client";
+import { env } from "@/server/env";
 import { getProjectBySlug } from "@/server/services/projects";
 
 async function ProjectShell({
@@ -20,6 +21,7 @@ async function ProjectShell({
     <DesignerStoreProvider
       key={project.slug}
       meta={{ name: project.name, slug: project.slug, description: project.description }}
+      appUrl={env().APP_URL}
       initial={{ document: project.document, revision: project.revision }}
     >
       <ProjectHeader />

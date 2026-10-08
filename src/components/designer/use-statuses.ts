@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { useStatusStore } from "@/stores/status-store";
+import { useStatusStore, type StatusEntry } from "@/stores/status-store";
 
 const POLL_MS = 10_000;
 
@@ -38,4 +38,4 @@ export function useStatuses(slug: string) {
   return useStatusStore((s) => (s.slug === slug ? s.statuses : EMPTY));
 }
 
-const EMPTY = {};
+const EMPTY: Record<string, StatusEntry> = {};

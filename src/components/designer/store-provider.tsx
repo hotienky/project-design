@@ -23,6 +23,7 @@ interface Context {
   store: DesignerStore;
   meta: ProjectMeta;
   saveNowRef: RefObject<() => Promise<void>>;
+  appUrl: string;
 }
 
 const DesignerContext = createContext<Context | null>(null);
@@ -36,10 +37,13 @@ function useContextOrThrow(): Context {
 export function DesignerStoreProvider({
   initial,
   meta,
+  appUrl,
   children,
 }: {
   initial: { document: DesignDocument; revision: number };
   meta: ProjectMeta;
+  /** Base URL shown in the "connect an agent" snippets. */
+  appUrl: string;
   children: React.ReactNode;
 }) {
   // One store per mount; the layout keys this component by slug.
@@ -53,7 +57,7 @@ export function DesignerStoreProvider({
   );
   const saveNowRef = useRef<() => Promise<void>>(async () => {});
   return (
-    <DesignerContext.Provider value={{ store, meta, saveNowRef }}>
+    <DesignerContext.Provider value={{ store, meta, saveNowRef, appUrl }}>
       <Autosave />
       {children}
     </DesignerContext.Provider>
@@ -62,6 +66,7 @@ export function DesignerStoreProvider({
 
 export const useDesignerStore = () => useContextOrThrow().store;
 export const useProjectMeta = () => useContextOrThrow().meta;
+export const useAppUrl = () => useContextOrThrow().appUrl;
 
 export function useDesigner<T>(selector: (state: DesignerState) => T): T {
   return useStore(useContextOrThrow().store, selector);

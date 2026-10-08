@@ -74,7 +74,7 @@ function StatusDot({ status }: { status: NonNullable<FlowNode["data"]["status"]>
           role="img"
           aria-label={`Status: ${style.label}`}
           data-status={status.status}
-          className={cn("size-2.5 shrink-0 rounded-full", style.dot)}
+          className={cn("inline-block size-2.5 shrink-0 rounded-full", style.dot)}
         />
       </TooltipTrigger>
       <TooltipContent>

@@ -904,16 +904,6 @@ All tabs edit the same store through `updateSections` and autosave like the canv
 
 ## 15. Phases (do them in order; each ends with `npm run verify && npm run test:e2e` green, the Compose stack healthy, and a commit)
 
-### Phase 6: Sections, brief, versions, status badges (≈ 2 days)
-- [ ] The section tabs (§11.8), publish/restore actions, status polling and badges, and the header Export/Connect menus.
-- [ ] **e2e** `e2e/agent-flow.spec.ts`:
-  - create a project from the example and publish v1;
-  - edit the draft; Versions → View changes lists the edit; restore v1 → the draft equals v1;
-  - create a scoped token;
-  - with the MCP client (`@modelcontextprotocol/client` from the test), call `set_component_status(svc_api, "done")` → within 12 s the canvas shows the green badge on API;
-  - the Brief tab text equals the `get_project_brief` output.
-- **Accept:** the scenario above passes, and a real Claude Code session using the `implement_design` prompt against the example starts with the brief and then the plan.
-
 ### Phase 7: Hardening and release (≈ 1.5 days)
 - [ ] README: what the app is, a screenshot (`docs/screenshot.png`, taken by Playwright), Docker quick start, development, connecting agents (§9.7), backup/restore (`docker compose exec db pg_dump -U design project_design > backup.sql` / `psql` restore), env vars table, and security notes (§14).
 - [ ] Run `/security-review` and fix the findings. Check that no `console.log` remains outside the `[migrate]`, `[mcp]`, `[api]` and `[health]` prefixes.
