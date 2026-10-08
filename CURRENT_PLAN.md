@@ -904,14 +904,6 @@ All tabs edit the same store through `updateSections` and autosave like the canv
 
 ## 15. Phases (do them in order; each ends with `npm run verify && npm run test:e2e` green, the Compose stack healthy, and a commit)
 
-### Phase 3: MCP server (≈ 2 days)
-- [ ] `context.ts`, `tools/*.ts` (12 tools), `prompts.ts`, `resources.ts`, then rewrite `server.ts` to register them (keep `createDesignMcpServer`'s signature and the server instructions, updated to mention `get_project_brief` and the `implement_design` prompt).
-- [ ] Update the VERIFIED `tests/mcp.integration.test.ts` expectation for the tool list to all 12 names. Add `tests/mcp-tools.integration.test.ts` (§9.6).
-- **Accept:**
-  - Run `npm run dev`, seed the example (a temporary script or the Phase 4 UI) and create a token.
-  - Run `claude mcp add --transport http project-design http://localhost:3000/api/mcp --header "Authorization: Bearer …"`.
-  - In Claude Code, `/mcp` shows 12 tools and 3 prompts, and asking it to "summarise the team-tasks design" calls `get_project_brief`.
-
 ### Phase 4: App shell, projects and settings (≈ 2 days)
 - [ ] `TopBar`, `ThemeToggle`, `src/app/error.tsx`, the projects page and actions (§11.3), the settings page and actions (§11.4). Replace the prototype `src/app/page.tsx`.
 - [ ] **e2e** `e2e/projects.spec.ts`:

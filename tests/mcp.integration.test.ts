@@ -49,9 +49,18 @@ describe("MCP endpoint", () => {
 
     const tools = await client.listTools();
     expect(tools.tools.map((t) => t.name).sort()).toEqual([
+      "get_api_contract",
+      "get_build_plan",
+      "get_component",
+      "get_data_model",
+      "get_design_changes",
       "get_design_schema",
+      "get_project_brief",
       "get_project_design",
+      "list_components",
       "list_projects",
+      "set_component_status",
+      "validate_design",
     ]);
 
     const projects = text(await client.callTool({ name: "list_projects", arguments: {} }));
