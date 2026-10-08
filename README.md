@@ -73,6 +73,11 @@ get_project_brief and implement it step by step."_
 | `validate_design`                                       | Warnings about unused, unimplemented or inconsistent parts      |
 | `get_design_changes`                                    | What changed between two versions (or a version and the draft)  |
 | `set_component_status`                                  | Write-back: `todo` / `in_progress` / `done` / `blocked` + note  |
+| `add_component`, `update_component`, `remove_components` | Edit components in the draft (validated, saved at once)         |
+| `connect_components`, `update_connection`, `remove_connections` | Edit typed connections between components               |
+| `update_overview`, `upsert_section_items`, `remove_section_items` | Edit the overview, stack, conventions and decisions   |
+| `apply_service_template`                                | Fill a service with a starter stack, conventions and layers     |
+| `save_project_design`                                   | Replace the whole draft (checks the revision)                   |
 
 Prompts: `implement_design`, `sync_design_changes`, `review_against_design`. Resources:
 `design://schema`, `design://projects/{slug}/brief`, `design://projects/{slug}/document`.

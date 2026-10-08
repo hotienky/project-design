@@ -3,6 +3,7 @@
  * (no dangling operation, channel, field or entity references). Pure and
  * isomorphic; the designer store applies them as single undo steps.
  */
+import { subtreeIds } from "@/lib/design/geometry";
 import { newEdgeId, newItemId, newNodeId } from "@/lib/design/ids";
 import type { DesignDocument, DesignNode, Field, TypeShape } from "@/lib/design/schema";
 import { getServiceTemplate } from "@/lib/design/service-templates";
@@ -139,6 +140,39 @@ export function scrubEntityRefs(doc: DesignDocument, gone: ReadonlySet<string>):
       }
     }),
   };
+}
+
+/**
+ * Removes nodes (with everything nested inside) and edges (plus edges of removed
+ * nodes). Stack/convention scopes and entity references to removed nodes are cleared.
+ */
+export function removeElements(
+  doc: DesignDocument,
+  { nodeIds = [], edgeIds = [] }: { nodeIds?: readonly string[]; edgeIds?: readonly string[] },
+): DesignDocument {
+  const doomed = new Set<string>();
+  for (const id of nodeIds) {
+    if (doc.nodes.some((n) => n.id === id)) for (const x of subtreeIds(doc, id)) doomed.add(x);
+  }
+  const doomedEdges = new Set(edgeIds);
+  if (doomed.size === 0 && !doc.edges.some((e) => doomedEdges.has(e.id))) return doc;
+  const keepId = (id: string) => !doomed.has(id);
+  const entities = new Set(
+    doc.nodes.filter((n) => doomed.has(n.id) && n.kind === "entity").map((n) => n.id),
+  );
+  return scrubEntityRefs(
+    {
+      ...doc,
+      nodes: doc.nodes.filter((n) => keepId(n.id)),
+      edges: doc.edges.filter(
+        (e) => !doomedEdges.has(e.id) && keepId(e.source) && keepId(e.target),
+      ),
+      // Scopes must not point at deleted nodes (integrity rule scope.unknown_node).
+      stack: doc.stack.map((s) => ({ ...s, scope: s.scope.filter(keepId) })),
+      conventions: doc.conventions.map((c) => ({ ...c, scope: c.scope.filter(keepId) })),
+    },
+    entities,
+  );
 }
 
 export interface TemplateApplication {

@@ -49,6 +49,9 @@ describe("MCP endpoint", () => {
 
     const tools = await client.listTools();
     expect(tools.tools.map((t) => t.name).sort()).toEqual([
+      "add_component",
+      "apply_service_template",
+      "connect_components",
       "get_api_contract",
       "get_build_plan",
       "get_component",
@@ -59,7 +62,15 @@ describe("MCP endpoint", () => {
       "get_project_design",
       "list_components",
       "list_projects",
+      "remove_components",
+      "remove_connections",
+      "remove_section_items",
+      "save_project_design",
       "set_component_status",
+      "update_component",
+      "update_connection",
+      "update_overview",
+      "upsert_section_items",
       "validate_design",
     ]);
 

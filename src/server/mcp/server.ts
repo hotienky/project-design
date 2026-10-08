@@ -5,6 +5,7 @@ import type { McpContext } from "@/server/mcp/context";
 import { registerPrompts } from "@/server/mcp/prompts";
 import { registerResources } from "@/server/mcp/resources";
 import { registerContractTools } from "@/server/mcp/tools/contracts";
+import { registerEditTools } from "@/server/mcp/tools/edit";
 import { registerPlanTools } from "@/server/mcp/tools/plan";
 import { registerReadTools } from "@/server/mcp/tools/read";
 import { registerSchemaTools } from "@/server/mcp/tools/schema";
@@ -19,13 +20,16 @@ export function createDesignMcpServer(deps: { db: Db; principal: Principal }): M
         "Project designs (stack, architecture, layers, APIs, data, integrations) that you must " +
         "follow when generating code. Start with list_projects, then get_design_schema once and " +
         "get_project_brief for the design. The implement_design prompt describes the full " +
-        "workflow; report progress with set_component_status.",
+        "workflow; report progress with set_component_status. To change the draft design, use " +
+        "the edit tools (add_component, update_component, connect_components, …); every edit " +
+        "is validated and saved immediately.",
     },
   );
   registerSchemaTools(server);
   registerReadTools(server, ctx);
   registerContractTools(server, ctx);
   registerPlanTools(server, ctx);
+  registerEditTools(server, ctx);
   registerPrompts(server, ctx);
   registerResources(server, ctx);
   return server;

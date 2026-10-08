@@ -255,6 +255,218 @@ describe("MCP tools", () => {
   });
 });
 
+describe("MCP edit tools", () => {
+  beforeEach(resetDb);
+
+  it("adds, updates, connects and removes components in the draft", async () => {
+    const { project, client } = await seed();
+
+    const added = json(
+      await call(client, "add_component", {
+        kind: "module",
+        name: "Billing",
+        parent: "Application",
+        data: { responsibilities: ["Charge teams"] },
+      }),
+    );
+    expect(added.id).toMatch(/^mod_/);
+    expect(added.revision).toBe(2);
+    expect(added.component).toMatchObject({ parentId: "lyr_app", data: { path: "" } });
+
+    const updated = json(
+      await call(client, "update_component", {
+        id: "Billing",
+        description: "Invoices",
+        data: { path: "src/billing" },
+      }),
+    );
+    expect(updated.component).toMatchObject({
+      name: "Billing",
+      description: "Invoices",
+      data: { path: "src/billing", responsibilities: ["Charge teams"] },
+    });
+
+    const edge = json(
+      await call(client, "connect_components", { source: added.id, target: "mod_domain" }),
+    );
+    expect(edge.connection).toMatchObject({ kind: "depends_on", target: "mod_domain" });
+    const duplicate = await call(client, "connect_components", {
+      source: added.id,
+      target: "mod_domain",
+    });
+    expect(duplicate.isError).toBe(true);
+    const badKind = await call(client, "connect_components", {
+      source: added.id,
+      target: "mod_domain",
+      kind: "relation",
+    });
+    expect(raw(badKind)).toContain("Allowed kinds: depends_on");
+
+    const relabelled = json(
+      await call(client, "update_connection", { id: edge.id, label: "uses model" }),
+    );
+    expect(relabelled.connection.label).toBe("uses model");
+
+    const component = json(await call(client, "get_component", { id: added.id }));
+    expect(component.relations.outgoing[0].edgeId).toBe(edge.id);
+
+    const removed = json(await call(client, "remove_components", { ids: ["svc_api"] }));
+    expect(removed.removed).toEqual(expect.arrayContaining(["svc_api", "lyr_app", added.id]));
+    const row = await getProject(db, project.slug);
+    expect(row.document.nodes.some((n) => n.id === added.id)).toBe(false);
+    expect(row.document.edges.some((e) => e.source === "svc_api" || e.id === edge.id)).toBe(false);
+    expect(json(await call(client, "validate_design")).errors).toBe(0);
+    await client.close();
+  });
+
+  it("rejects invalid edits with the reasons and leaves the draft alone", async () => {
+    const { project, client } = await seed();
+
+    const badParent = await call(client, "add_component", {
+      kind: "layer",
+      name: "Orphan",
+      parent: "Main database",
+    });
+    expect(badParent.isError).toBe(true);
+    expect(raw(badParent)).toContain("A layer cannot be placed inside a datastore");
+
+    const badData = await call(client, "update_component", {
+      id: "svc_api",
+      data: { port: 70000 },
+    });
+    expect(badData.isError).toBe(true);
+    expect(raw(badData)).toContain("data.port");
+
+    const badMove = await call(client, "update_component", { id: "lyr_app", parent: null });
+    expect(raw(badMove)).toContain("cannot be placed inside the canvas");
+
+    expect((await getProject(db, project.slug)).revision).toBe(1);
+    await client.close();
+  });
+
+  it("removing an API operation clears the calls edges that used it", async () => {
+    const { project, client } = await seed();
+    const api = json(await call(client, "get_component", { id: "api_rest" })).component;
+    const operations = api.data.operations.filter((o: { id: string }) => o.id !== "op_create");
+    await call(client, "update_component", { id: "api_rest", data: { operations } });
+    const row = await getProject(db, project.slug);
+    const calls = row.document.edges.find((e) => e.id === "e_web_api");
+    expect(calls?.kind === "calls" && calls.data.operations).toEqual(["op_list", "op_complete"]);
+
+    const withNew = json(
+      await call(client, "update_component", {
+        id: "api_rest",
+        data: { operations: [...operations, { name: "deleteTask", method: "DELETE", path: "/x" }] },
+      }),
+    );
+    expect(withNew.component.data.operations.at(-1).id).toMatch(/^op_/);
+    await client.close();
+  });
+
+  it("edits the overview and the stack, conventions and decisions", async () => {
+    const { project, client } = await seed();
+
+    await call(client, "update_overview", {
+      summary: "New summary",
+      repository: { packageManager: "pnpm" },
+    });
+    const added = json(
+      await call(client, "upsert_section_items", {
+        section: "stack",
+        items: [{ category: "cache", name: "Redis", version: "8", scope: ["API"] }],
+      }),
+    );
+    expect(added.ids).toHaveLength(1);
+    await call(client, "upsert_section_items", {
+      section: "stack",
+      items: [{ id: added.ids[0], version: "8.2" }],
+    });
+    const unknown = await call(client, "upsert_section_items", {
+      section: "decisions",
+      items: [{ id: "adr_nope", title: "x" }],
+    });
+    expect(unknown.isError).toBe(true);
+    const invalidItem = await call(client, "upsert_section_items", {
+      section: "conventions",
+      items: [{ category: "naming" }],
+    });
+    expect(raw(invalidItem)).toContain("rule");
+
+    let row = await getProject(db, project.slug);
+    expect(row.document.overview.summary).toBe("New summary");
+    expect(row.document.overview.repository.packageManager).toBe("pnpm");
+    expect(row.document.overview.goals.length).toBeGreaterThan(0);
+    expect(row.document.stack.find((s) => s.id === added.ids[0])).toMatchObject({
+      name: "Redis",
+      version: "8.2",
+      scope: ["svc_api"],
+    });
+
+    await call(client, "remove_section_items", { section: "stack", ids: added.ids });
+    row = await getProject(db, project.slug);
+    expect(row.document.stack.some((s) => s.id === added.ids[0])).toBe(false);
+    await client.close();
+  });
+
+  it("applies a service template to a new service", async () => {
+    const { client } = await seed();
+    const service = json(await call(client, "add_component", { kind: "service", name: "Jobs" }));
+    const applied = json(
+      await call(client, "apply_service_template", { service: "Jobs", template: "node-fastify" }),
+    );
+    expect(applied.added.layers).toBeGreaterThan(0);
+    const children = json(await call(client, "list_components", { parentId: service.id }));
+    expect(children.length).toBe(applied.added.layers);
+    await client.close();
+  });
+
+  it("save_project_design replaces the draft and checks the revision", async () => {
+    const { project, client } = await seed();
+    const design = json(await call(client, "get_project_design"));
+    design.document.overview.summary = "Rewritten";
+
+    const stale = await call(client, "save_project_design", {
+      revision: design.revision + 5,
+      document: design.document,
+    });
+    expect(stale.isError).toBe(true);
+    expect(raw(stale)).toContain("current revision 1");
+
+    const invalid = await call(client, "save_project_design", {
+      revision: design.revision,
+      document: { ...design.document, nodes: [{ id: "x", kind: "layer", name: "Loose" }] },
+    });
+    expect(raw(invalid)).toContain("must be placed inside a container");
+
+    const ok = json(
+      await call(client, "save_project_design", {
+        revision: design.revision,
+        document: design.document,
+      }),
+    );
+    expect(ok.revision).toBe(2);
+    expect((await getProject(db, project.slug)).document.overview.summary).toBe("Rewritten");
+    await client.close();
+  });
+
+  it("a scoped token cannot edit another project", async () => {
+    const { project } = await seed();
+    await createProject(db, { name: "Other", document: { schemaVersion: 1 } });
+    const scoped = await createToken(db, { name: "scoped", projectId: project.id });
+    const client = await connect(scoped.token);
+    const denied = await call(client, "add_component", {
+      project: "other",
+      kind: "service",
+      name: "X",
+    });
+    expect(denied.isError).toBe(true);
+    expect(json(await call(client, "add_component", { kind: "service", name: "X" })).id).toMatch(
+      /^svc_/,
+    );
+    await client.close();
+  });
+});
+
 describe("MCP prompts and resources", () => {
   beforeEach(resetDb);
 

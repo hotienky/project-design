@@ -122,3 +122,51 @@ export function reparentNode(
     nodes: sortNodesParentFirst(doc.nodes.map((n) => (n.id === nodeId ? moved : n))),
   };
 }
+
+const PAD = 24;
+const HEADER = 48;
+const GAP = 40;
+
+/**
+ * Where a new node goes when nobody dragged it there: below its last sibling
+ * inside a container, or to the right of everything at the top level.
+ */
+export function freePosition(doc: DesignDocument, parentId: string | null): Point {
+  const siblings = doc.nodes.filter((n) => n.parentId === parentId);
+  if (parentId === null) {
+    const right = Math.max(0, ...siblings.map((n) => n.position.x + nodeSize(n).width + GAP));
+    return { x: siblings.length ? right : 0, y: 0 };
+  }
+  const bottom = Math.max(
+    HEADER,
+    ...siblings.map((n) => n.position.y + nodeSize(n).height + PAD / 2),
+  );
+  return { x: PAD, y: bottom };
+}
+
+/** Grows a container (and its ancestors) so every child fits inside it. */
+export function growToFit(doc: DesignDocument, containerId: string | null): DesignDocument {
+  let next = doc;
+  let id = containerId;
+  while (id !== null) {
+    const container = next.nodes.find((n) => n.id === id);
+    if (!container) break;
+    const size = nodeSize(container);
+    let width = size.width;
+    let height = size.height;
+    for (const c of next.nodes) {
+      if (c.parentId !== id) continue;
+      const s = nodeSize(c);
+      width = Math.max(width, c.position.x + s.width + PAD);
+      height = Math.max(height, c.position.y + s.height + PAD);
+    }
+    if (width !== size.width || height !== size.height) {
+      next = {
+        ...next,
+        nodes: next.nodes.map((n) => (n.id === id ? { ...n, size: { width, height } } : n)),
+      };
+    }
+    id = container.parentId;
+  }
+  return next;
+}

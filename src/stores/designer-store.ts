@@ -14,12 +14,12 @@ import {
   applyServiceTemplate,
   removeChannel,
   removeField,
+  removeElements,
   removeOperation,
   renameField,
-  scrubEntityRefs,
   type TemplateApplication,
 } from "@/lib/design/edits";
-import { reparentNode, subtreeIds, type Point } from "@/lib/design/geometry";
+import { reparentNode, type Point } from "@/lib/design/geometry";
 import { newEdgeId, newNodeId } from "@/lib/design/ids";
 import { safeParseDesign, sortNodesParentFirst } from "@/lib/design/integrity";
 import {
@@ -171,33 +171,8 @@ export function createDesignerStore(init: {
             }));
           },
 
-          removeElements({ nodeIds = [], edgeIds = [] }) {
-            mutate((doc) => {
-              const doomed = new Set<string>();
-              for (const id of nodeIds) for (const x of subtreeIds(doc, id)) doomed.add(x);
-              const doomedEdges = new Set(edgeIds);
-              if (doomed.size === 0 && doomedEdges.size === 0) return doc;
-              const keepId = (id: string) => !doomed.has(id);
-              const entities = new Set(
-                doc.nodes.filter((n) => doomed.has(n.id) && n.kind === "entity").map((n) => n.id),
-              );
-              return scrubEntityRefs(
-                {
-                  ...doc,
-                  nodes: doc.nodes.filter((n) => keepId(n.id)),
-                  edges: doc.edges.filter(
-                    (e) => !doomedEdges.has(e.id) && keepId(e.source) && keepId(e.target),
-                  ),
-                  // Scopes must not point at deleted nodes (integrity rule scope.unknown_node).
-                  stack: doc.stack.map((s) => ({ ...s, scope: s.scope.filter(keepId) })),
-                  conventions: doc.conventions.map((c) => ({
-                    ...c,
-                    scope: c.scope.filter(keepId),
-                  })),
-                },
-                entities,
-              );
-            });
+          removeElements(ids) {
+            mutate((doc) => removeElements(doc, ids));
           },
 
           updateSections(patch) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   removeChannel,
+  removeElements,
   removeField,
   removeOperation,
   renameField,
@@ -65,5 +66,15 @@ describe("document edits keep the design valid", () => {
         edges: next.edges.filter((e) => !gone.has(e.source) && !gone.has(e.target)),
       }),
     ).toEqual([]);
+  });
+
+  it("removeElements removes subtrees, their edges, scopes and entity refs", () => {
+    const next = removeElements(doc(), { nodeIds: ["svc_api", "dst_pg"], edgeIds: ["e_web_api"] });
+    expect(next.nodes.some((n) => n.id === "mod_usecases" || n.id === "ent_task")).toBe(false);
+    expect(next.edges.some((e) => e.id === "e_web_api")).toBe(false);
+    expect(next.stack.every((s) => !s.scope.includes("svc_api"))).toBe(true);
+    expect(checkIntegrity(next)).toEqual([]);
+    const d = doc();
+    expect(removeElements(d, { nodeIds: ["ghost"] })).toBe(d);
   });
 });

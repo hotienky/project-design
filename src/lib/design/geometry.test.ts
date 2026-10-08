@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { teamTasksDesign } from "@/lib/design/examples/team-tasks";
-import { absolutePosition, findDropParent, reparentNode } from "@/lib/design/geometry";
+import {
+  absolutePosition,
+  findDropParent,
+  freePosition,
+  growToFit,
+  nodeSize,
+  reparentNode,
+} from "@/lib/design/geometry";
 import { parseDesign } from "@/lib/design/integrity";
 
 const doc = () => parseDesign(teamTasksDesign);
@@ -40,5 +47,28 @@ describe("geometry", () => {
     const d = doc();
     expect(() => reparentNode(d, "lyr_app", null)).toThrow(/cannot be placed/);
     expect(() => reparentNode(d, "svc_api", "lyr_app")).toThrow();
+  });
+
+  it("places new nodes below their siblings and grows containers to fit", () => {
+    const d = doc();
+    const pos = freePosition(d, "lyr_app");
+    const siblings = d.nodes.filter((n) => n.parentId === "lyr_app");
+    for (const n of siblings)
+      expect(pos.y).toBeGreaterThanOrEqual(n.position.y + nodeSize(n).height);
+    const top = freePosition(d, null);
+    expect(top.y).toBe(0);
+    expect(top.x).toBeGreaterThan(0);
+
+    const moved = {
+      ...d,
+      nodes: d.nodes.map((n) =>
+        n.id === "mod_usecases" ? { ...n, position: { x: 20, y: 900 } } : n,
+      ),
+    };
+    const grown = growToFit(moved, "lyr_app");
+    const layer = grown.nodes.find((n) => n.id === "lyr_app")!;
+    const service = grown.nodes.find((n) => n.id === "svc_api")!;
+    expect(nodeSize(layer).height).toBeGreaterThan(900);
+    expect(nodeSize(service).height).toBeGreaterThan(layer.position.y + nodeSize(layer).height);
   });
 });

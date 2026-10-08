@@ -28,7 +28,10 @@ const GUIDE = `# How to read a design
   generate imports that go against it.
 - **Versions.** The *draft* is the working copy; *published versions* are immutable snapshots. Pin
   a version number when you want a stable target.
-- Report progress with set_component_status so the designer sees it on the canvas.`;
+- Report progress with set_component_status so the designer sees it on the canvas.
+- **Editing.** The edit tools change the *draft* only (never a published version). Each call is
+  checked against the same rules as the canvas and saved at once; an invalid change is rejected
+  with the reasons. Prefer them to save_project_design, which replaces the whole document.`;
 
 export function registerSchemaTools(server: McpServer) {
   server.registerTool(
