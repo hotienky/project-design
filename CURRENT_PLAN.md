@@ -904,23 +904,6 @@ All tabs edit the same store through `updateSections` and autosave like the canv
 
 ## 15. Phases (do them in order; each ends with `npm run verify && npm run test:e2e` green, the Compose stack healthy, and a commit)
 
-### Phase 0: Scaffold (≈ 0.5 day)
-- [ ] §5 exactly.
-- **Accept:** the §5 expected results.
-
-### Phase 1: Design core (≈ 2 days)
-- [ ] `graph.ts`, `validate.ts`, `brief.ts`, `openapi.ts`, `datamodel.ts`, `build-plan.ts`, `diff.ts`, `export-format.ts`, `slug.ts` per §7.3–7.10.
-- [ ] **Tests:**
-  - one `*.test.ts` per module;
-  - file snapshots in `src/lib/design/__fixtures__/`;
-  - example has 0 errors/0 warnings;
-  - one failing document per validation rule;
-  - build-plan order assertions and cycle handling;
-  - diff cases;
-  - slug cases (`"Team Tasks!"` → `team-tasks`, `"Ünïcödé"` → `unicode`, `"---"` → `project`);
-  - envelope round trip.
-- **Accept:** `npm run test` is green, and the generated brief for the example reads well when you review it.
-
 ### Phase 2: Persistence and REST (≈ 2 days)
 - [ ] `errors.ts`, `http.ts`, full `projects.ts`, `versions.ts`, `status.ts` (§8.2) and the routes (§10).
 - [ ] **Tests:** the §8.2 list, plus `tests/rest.integration.test.ts`.

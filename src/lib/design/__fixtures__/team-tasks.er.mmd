@@ -1,0 +1,20 @@
+erDiagram
+  User {
+    uuid id PK
+    email email UK
+    string name
+  }
+  Project {
+    uuid id PK
+    string name
+  }
+  Task {
+    uuid id PK
+    uuid projectId FK
+    uuid assigneeId FK
+    string title
+    enum status
+    datetime createdAt
+  }
+  Project ||--|{ Task : "projectId"
+  User ||--o{ Task : "assigneeId"
