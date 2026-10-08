@@ -904,14 +904,6 @@ All tabs edit the same store through `updateSections` and autosave like the canv
 
 ## 15. Phases (do them in order; each ends with `npm run verify && npm run test:e2e` green, the Compose stack healthy, and a commit)
 
-### Phase 4: App shell, projects and settings (≈ 2 days)
-- [ ] `TopBar`, `ThemeToggle`, `src/app/error.tsx`, the projects page and actions (§11.3), the settings page and actions (§11.4). Replace the prototype `src/app/page.tsx`.
-- [ ] **e2e** `e2e/projects.spec.ts`:
-  - create from the example → lands on the project;
-  - rename; duplicate; export download contains `"format": "project-design"`; import that file; delete;
-  - create a token → the token is shown once and the list shows its prefix; revoke.
-- **Accept:** keyboard-only use reaches every control; light and dark both look right. `e2e/smoke.spec.ts` still passes, so the project card title must stay a link named after the project.
-
 ### Phase 5: Designer (≈ 4 days)
 - [ ] The project layout (§11.5), store provider, autosave (§12), canvas (§11.6), inspector (§11.7), selection and status stores, `to-flow.ts` (+ unit tests). Replace the prototype `canvas.tsx` and `projects/[slug]/page.tsx`.
 - [ ] **e2e** `e2e/designer.spec.ts`:

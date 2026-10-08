@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 
+import { TopBar } from "@/components/app-shell/top-bar";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -18,7 +19,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <Providers>{children}</Providers>
+        <Providers>
+          <TopBar />
+          <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        </Providers>
       </body>
     </html>
   );
