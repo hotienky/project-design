@@ -15,8 +15,90 @@ export interface Rect extends Point {
   height: number;
 }
 
+export interface CardMetric {
+  key: "responsibilities" | "env" | "rules" | "exports" | "goals" | "patterns" | "tags";
+  value: number;
+  label: string;
+}
+
+/** Counts a card shows as chips, per kind. Zero counts, and counts the subtitle already shows, are left out. */
+export function cardMetrics(n: DesignNode): CardMetric[] {
+  const own: CardMetric[] = [];
+  switch (n.kind) {
+    case "service":
+      own.push(
+        {
+          key: "responsibilities",
+          value: n.data.responsibilities.length,
+          label: "responsibilities",
+        },
+        { key: "env", value: n.data.env.length, label: "environment variables" },
+      );
+      break;
+    case "layer":
+      own.push(
+        {
+          key: "responsibilities",
+          value: n.data.responsibilities.length,
+          label: "responsibilities",
+        },
+        { key: "rules", value: n.data.rules.length, label: "rules" },
+      );
+      break;
+    case "module":
+      if (n.data.responsibilities.length > 0)
+        own.push({ key: "exports", value: n.data.exports.length, label: "exports" });
+      break;
+    case "integration":
+      own.push({ key: "env", value: n.data.env.length, label: "environment variables" });
+      break;
+    case "actor":
+      own.push({ key: "goals", value: n.data.goals.length, label: "goals" });
+      break;
+  }
+  own.push(
+    { key: "patterns", value: n.patterns.length, label: "patterns" },
+    { key: "tags", value: n.tags.length, label: "tags" },
+  );
+  return own.filter((m) => m.value > 0);
+}
+
+/** An entity card lists at most this many fields, then a "+N more" row. */
+export const ENTITY_FIELD_ROWS = 6;
+
+/**
+ * Rendered card geometry (base-node.tsx), in canvas pixels. Leaf cards size to their
+ * content, so layout code needs the same numbers to keep siblings from overlapping.
+ */
+const CARD = {
+  width: 208,
+  /** Border, padding and the two-line title. */
+  base: 54,
+  /** Metric/status chip row with its top margin. */
+  chips: 26,
+  /** Field list chrome: top margin, border and vertical padding. */
+  fieldList: 22,
+  fieldRow: 16.5,
+  fieldGap: 2,
+};
+
+/**
+ * A node's footprint on the canvas: the stored size for containers (and anything
+ * resized), otherwise the size its card renders at. The agent-reported status chip
+ * is not part of the document, so a card that shows only that chip renders one
+ * chip row taller than this.
+ */
 export function nodeSize(n: DesignNode): { width: number; height: number } {
-  return n.size ?? NODE_KIND_META[n.kind].defaultSize;
+  if (n.size) return n.size;
+  const meta = NODE_KIND_META[n.kind];
+  if (meta.container || n.kind === "note") return meta.defaultSize;
+  let height = CARD.base;
+  if (n.kind === "entity" && n.data.fields.length > 0) {
+    const rows = Math.min(n.data.fields.length, ENTITY_FIELD_ROWS + 1);
+    height += CARD.fieldList + rows * CARD.fieldRow + (rows - 1) * CARD.fieldGap;
+  }
+  if (cardMetrics(n).length > 0) height += CARD.chips;
+  return { width: CARD.width, height: Math.ceil(height) };
 }
 
 export function absolutePosition(doc: DesignDocument, id: string): Point {

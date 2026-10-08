@@ -249,6 +249,8 @@ export function registerEditTools(server: McpServer, ctx: McpContext) {
         if (parent !== undefined) {
           const parentId = parent === null ? null : findNode(index, parent).id;
           document = growToFit(reparent(document, before.id, parentId), parentId);
+        } else if (fields.position !== undefined) {
+          document = growToFit(document, before.parentId);
         }
         return { document, result: { component: document.nodes.find((n) => n.id === before.id)! } };
       });

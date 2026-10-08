@@ -233,7 +233,7 @@ export const teamTasksDesign: DesignDocumentInput = {
       kind: "datastore",
       name: "Main database",
       position: { x: 1040, y: 0 },
-      size: { width: 300, height: 420 },
+      size: { width: 300, height: 520 },
       data: { engine: "postgres", version: "18", purpose: "System of record" },
     },
     {
@@ -255,7 +255,7 @@ export const teamTasksDesign: DesignDocumentInput = {
       kind: "entity",
       name: "Project",
       parentId: "dst_pg",
-      position: { x: 20, y: 160 },
+      position: { x: 20, y: 184 },
       data: {
         fields: [
           { name: "id", type: "uuid", primary: true },
@@ -268,7 +268,7 @@ export const teamTasksDesign: DesignDocumentInput = {
       kind: "entity",
       name: "Task",
       parentId: "dst_pg",
-      position: { x: 20, y: 280 },
+      position: { x: 20, y: 308 },
       data: {
         fields: [
           { name: "id", type: "uuid", primary: true },
@@ -285,7 +285,7 @@ export const teamTasksDesign: DesignDocumentInput = {
       id: "que_events",
       kind: "queue",
       name: "Domain events",
-      position: { x: 1040, y: 500 },
+      position: { x: 1040, y: 580 },
       data: {
         technology: "redis-streams",
         channels: [

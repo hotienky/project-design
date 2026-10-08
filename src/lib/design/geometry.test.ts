@@ -14,6 +14,25 @@ import { parseDesign } from "@/lib/design/integrity";
 const doc = () => parseDesign(teamTasksDesign);
 
 describe("geometry", () => {
+  it("sizes leaf cards to their rendered content", () => {
+    const d = doc();
+    const size = (id: string) => nodeSize(d.nodes.find((n) => n.id === id)!);
+    // Measured in the browser: title only 208×54, six fields 185, six shown + "+N more" 204.
+    expect(size("api_rest")).toEqual({ width: 208, height: 54 });
+    expect(size("ent_task")).toEqual({ width: 208, height: 185 });
+    const task = d.nodes.find((n) => n.id === "ent_task")!;
+    if (task.kind !== "entity") throw new Error("expected an entity");
+    const eight = {
+      ...task,
+      data: { ...task.data, fields: [...task.data.fields, ...task.data.fields.slice(0, 2)] },
+    };
+    expect(nodeSize(eight).height).toBe(204);
+    // A chip row (here: tags) adds 26.
+    expect(nodeSize({ ...task, tags: ["core"] }).height).toBe(211);
+    // Containers keep their stored size.
+    expect(size("dst_pg")).toEqual({ width: 300, height: 520 });
+  });
+
   it("sums positions up the parent chain", () => {
     // svc_api (420,0) → lyr_app (20,160) → mod_usecases (20,20)
     expect(absolutePosition(doc(), "mod_usecases")).toEqual({ x: 460, y: 180 });

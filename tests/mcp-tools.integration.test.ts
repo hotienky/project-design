@@ -310,6 +310,12 @@ describe("MCP edit tools", () => {
     const component = json(await call(client, "get_component", { id: added.id }));
     expect(component.relations.outgoing[0].edgeId).toBe(edge.id);
 
+    await call(client, "update_component", { id: "Task", position: { x: 20, y: 600 } });
+    const moved = (await getProject(db, project.slug)).document.nodes.find(
+      (n) => n.id === "dst_pg",
+    );
+    expect(moved?.size?.height).toBe(600 + 185 + 24); // grown to fit the moved entity
+
     const removed = json(await call(client, "remove_components", { ids: ["svc_api"] }));
     expect(removed.removed).toEqual(expect.arrayContaining(["svc_api", "lyr_app", added.id]));
     const row = await getProject(db, project.slug);

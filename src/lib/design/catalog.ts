@@ -47,7 +47,7 @@ export const NODE_KIND_META: Record<NodeKind, NodeKindMeta> = {
     icon: "Puzzle",
     container: false,
     parents: ["service", "layer"],
-    defaultSize: { width: 200, height: 72 },
+    defaultSize: { width: 208, height: 54 },
     description:
       "A cohesive unit of code (feature, component, package or class group) with the listed " +
       "responsibilities. data.exports is its public interface; other modules use only that.",
@@ -57,7 +57,7 @@ export const NODE_KIND_META: Record<NodeKind, NodeKindMeta> = {
     icon: "Table2",
     container: false,
     parents: [null, "datastore", "layer", "service"],
-    defaultSize: { width: 220, height: 120 },
+    defaultSize: { width: 208, height: 54 },
     description:
       "A data model with typed fields. Inside a datastore it is a persisted table/collection; " +
       "inside a layer or service it is a domain/model type. Relations between entities are " +
@@ -78,7 +78,7 @@ export const NODE_KIND_META: Record<NodeKind, NodeKindMeta> = {
     icon: "Plug",
     container: false,
     parents: [null],
-    defaultSize: { width: 220, height: 96 },
+    defaultSize: { width: 208, height: 54 },
     description:
       "An interface contract (REST, GraphQL, gRPC, tRPC, WebSocket) with operations and typed " +
       "payloads. The service/module with an exposes edge implements it; nodes with calls edges " +
@@ -89,7 +89,7 @@ export const NODE_KIND_META: Record<NodeKind, NodeKindMeta> = {
     icon: "Cable",
     container: false,
     parents: [null],
-    defaultSize: { width: 220, height: 80 },
+    defaultSize: { width: 208, height: 54 },
     description:
       "A third-party system (payments, email, auth, AI, storage…). Wrap it behind an adapter in " +
       "each node that has a uses edge to it; data.env lists the credentials it needs.",
@@ -99,7 +99,7 @@ export const NODE_KIND_META: Record<NodeKind, NodeKindMeta> = {
     icon: "Waypoints",
     container: false,
     parents: [null],
-    defaultSize: { width: 220, height: 96 },
+    defaultSize: { width: 208, height: 54 },
     description:
       "A message broker or event bus with named channels and typed payloads. Producers have " +
       "publishes edges, consumers have subscribes edges (edge.data.channelId picks the channel).",
@@ -109,7 +109,7 @@ export const NODE_KIND_META: Record<NodeKind, NodeKindMeta> = {
     icon: "User",
     container: false,
     parents: [null],
-    defaultSize: { width: 180, height: 72 },
+    defaultSize: { width: 208, height: 54 },
     description:
       "A human role or external system that uses the project. Context only; nothing is generated.",
   },
@@ -118,7 +118,7 @@ export const NODE_KIND_META: Record<NodeKind, NodeKindMeta> = {
     icon: "StickyNote",
     container: false,
     parents: [null, "service", "layer", "datastore"],
-    defaultSize: { width: 220, height: 120 },
+    defaultSize: { width: 208, height: 112 },
     description: "A free-text annotation. Read it as guidance; it generates nothing by itself.",
   },
 };

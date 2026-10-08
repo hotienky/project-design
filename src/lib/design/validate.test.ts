@@ -19,6 +19,20 @@ describe("validateDesign", () => {
     expect(issues.filter((i) => i.severity !== "info")).toEqual([]);
   });
 
+  it("warns when siblings overlap on the canvas", () => {
+    const doc = parseDesign(teamTasksDesign);
+    const project = doc.nodes.find((n) => n.id === "ent_project")!;
+    project.position = { x: 20, y: 100 }; // User (y 40) is 130 tall
+    const overlaps = validateDesign(doc).filter((i) => i.code === "layout.overlap");
+    expect(overlaps).toEqual([
+      expect.objectContaining({ severity: "warning", nodeId: "ent_project" }),
+    ]);
+    // The same coordinates in different containers are different places.
+    expect(
+      validateDesign(parseDesign(teamTasksDesign)).some((i) => i.code === "layout.overlap"),
+    ).toBe(false);
+  });
+
   it("sorts errors, then warnings, then info", () => {
     const doc = parseDesign(teamTasksDesign);
     const ent = doc.nodes.find((n) => n.id === "ent_task")!;

@@ -1,4 +1,5 @@
 /** Quality checks on a design. Structural errors come from integrity.ts; this adds warnings and hints. */
+import { nodeSize } from "@/lib/design/geometry";
 import { indexDesign, type DesignIndex } from "@/lib/design/graph";
 import { checkIntegrity, type Issue } from "@/lib/design/integrity";
 import type { DesignDocument, DesignEdge, DesignNode } from "@/lib/design/schema";
@@ -27,6 +28,7 @@ export function validateDesign(doc: DesignDocument): Issue[] {
   checkApis(index, add);
   checkData(index, add);
   checkMessaging(index, add);
+  checkOverlaps(doc, add);
 
   for (const n of doc.nodes) {
     if (n.kind === "integration" && index.incoming(n.id, "uses").length === 0) {
@@ -364,3 +366,35 @@ function checkMessaging(index: DesignIndex, add: Add) {
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Siblings (same container, positions in the same frame) whose boxes intersect hide each other on the canvas. */
+function checkOverlaps(doc: DesignDocument, add: Add) {
+  const groups = new Map<string | null, DesignNode[]>();
+  for (const n of doc.nodes) {
+    const siblings = groups.get(n.parentId) ?? [];
+    siblings.push(n);
+    groups.set(n.parentId, siblings);
+  }
+  for (const siblings of groups.values()) {
+    const boxes = siblings.map((n) => ({ n, ...n.position, ...nodeSize(n) }));
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = 0; j < i; j++) {
+        const a = boxes[i]!;
+        const b = boxes[j]!;
+        if (
+          a.x < b.x + b.width &&
+          b.x < a.x + a.width &&
+          a.y < b.y + b.height &&
+          b.y < a.y + a.height
+        ) {
+          add(
+            "warning",
+            "layout.overlap",
+            `"${a.n.name}" overlaps "${b.n.name}" on the canvas; move one of them (positions are relative to the container; \"${a.n.name}\" is ${a.width}×${a.height}).`,
+            { nodeId: a.n.id },
+          );
+        }
+      }
+    }
+  }
+}

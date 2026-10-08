@@ -19,6 +19,7 @@ import { useDesignerStore } from "@/components/designer/store-provider";
 import type { FlowNode } from "@/components/designer/to-flow";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NODE_KIND_META } from "@/lib/design/catalog";
+import { cardMetrics, ENTITY_FIELD_ROWS, type CardMetric } from "@/lib/design/geometry";
 import type { DesignNode } from "@/lib/design/schema";
 import { cn } from "@/lib/utils";
 
@@ -80,45 +81,15 @@ function subtitleOf(n: DesignNode): string {
   }
 }
 
-interface Metric {
-  icon: LucideIcon;
-  value: number;
-  label: string;
-}
-
-/** Counts worth seeing at a glance, per kind. Zero counts, and counts the subtitle already shows, are left out. */
-function metricsOf(n: DesignNode): Metric[] {
-  const own: Metric[] = [];
-  switch (n.kind) {
-    case "service":
-      own.push(
-        { icon: ListChecks, value: n.data.responsibilities.length, label: "responsibilities" },
-        { icon: KeyRound, value: n.data.env.length, label: "environment variables" },
-      );
-      break;
-    case "layer":
-      own.push(
-        { icon: ListChecks, value: n.data.responsibilities.length, label: "responsibilities" },
-        { icon: Ruler, value: n.data.rules.length, label: "rules" },
-      );
-      break;
-    case "module":
-      if (n.data.responsibilities.length > 0)
-        own.push({ icon: PackageOpen, value: n.data.exports.length, label: "exports" });
-      break;
-    case "integration":
-      own.push({ icon: KeyRound, value: n.data.env.length, label: "environment variables" });
-      break;
-    case "actor":
-      own.push({ icon: Target, value: n.data.goals.length, label: "goals" });
-      break;
-  }
-  own.push(
-    { icon: Shapes, value: n.patterns.length, label: "patterns" },
-    { icon: Tag, value: n.tags.length, label: "tags" },
-  );
-  return own.filter((m) => m.value > 0);
-}
+const METRIC_ICON: Record<CardMetric["key"], LucideIcon> = {
+  responsibilities: ListChecks,
+  env: KeyRound,
+  rules: Ruler,
+  exports: PackageOpen,
+  goals: Target,
+  patterns: Shapes,
+  tags: Tag,
+};
 
 const chip =
   "inline-flex h-[18px] shrink-0 items-center gap-1 rounded-md border bg-background px-1.5 text-[11px] leading-none font-medium tabular-nums";
@@ -150,26 +121,29 @@ function StatusChip({ status }: { status: NonNullable<FlowNode["data"]["status"]
 /** The footer row: metric chips (icon + count) and the agent-reported status. */
 function Chips({ data, className }: { data: FlowNode["data"]; className?: string }) {
   const { node, status } = data;
-  const metrics = metricsOf(node);
+  const metrics = cardMetrics(node);
   if (metrics.length === 0 && !status) return null;
   return (
     <div className={cn("flex flex-wrap items-center gap-1", className)}>
-      {metrics.map(({ icon: Icon, value, label }) => (
-        <span
-          key={label}
-          className={cn(chip, "text-foreground/80")}
-          title={
-            label === "patterns"
-              ? node.patterns.map((p) => p.name).join(", ")
-              : label === "tags"
-                ? node.tags.join(", ")
-                : `${value} ${label}`
-          }
-        >
-          <Icon className="size-3 text-muted-foreground" aria-hidden />
-          {value}
-        </span>
-      ))}
+      {metrics.map(({ key, value, label }) => {
+        const Icon = METRIC_ICON[key];
+        return (
+          <span
+            key={key}
+            className={cn(chip, "text-foreground/80")}
+            title={
+              label === "patterns"
+                ? node.patterns.map((p) => p.name).join(", ")
+                : label === "tags"
+                  ? node.tags.join(", ")
+                  : `${value} ${label}`
+            }
+          >
+            <Icon className="size-3 text-muted-foreground" aria-hidden />
+            {value}
+          </span>
+        );
+      })}
       {status && <StatusChip status={status} />}
     </div>
   );
@@ -254,7 +228,7 @@ export function CardNode({ data, selected }: NodeProps<FlowNode>) {
 export function EntityNode({ data, selected }: NodeProps<FlowNode>) {
   const { node } = data;
   if (node.kind !== "entity") return null;
-  const fields = node.data.fields.slice(0, 6);
+  const fields = node.data.fields.slice(0, ENTITY_FIELD_ROWS);
   return (
     <div data-selected={selected} className={cn(card, selected && selectedRing)}>
       <Handles kind={node.kind} />
