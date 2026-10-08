@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { teamTasksDesign } from "@/lib/design/examples/team-tasks";
@@ -34,6 +35,23 @@ async function rejection(promise: Promise<unknown>): Promise<AppError> {
 
 describe("projects service", () => {
   beforeEach(resetDb);
+
+  it("reads documents stored before a schema change with the new defaults", async () => {
+    const created = await createProject(db, { name: "Legacy", document: example() });
+    // An exposes edge as stored before edges had `operations`.
+    await db.execute(sql`
+      update projects
+      set document = jsonb_set(
+        document,
+        '{edges}',
+        (select jsonb_agg(case when e->>'kind' = 'exposes' then e || '{"data": {}}' else e end)
+         from jsonb_array_elements(document->'edges') e)
+      )
+      where id = ${created.id}`);
+    const { document } = await getProject(db, created.slug);
+    const exposes = document.edges.find((e) => e.kind === "exposes");
+    expect(exposes?.kind === "exposes" && exposes.data.operations).toEqual([]);
+  });
 
   it("derives slugs from names and resolves collisions", async () => {
     const a = await createProject(db, { name: "Team Tasks" });

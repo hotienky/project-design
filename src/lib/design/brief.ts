@@ -240,7 +240,12 @@ export function renderBrief(input: BriefInput): string {
   const apis: string[] = [];
   for (const n of doc.nodes) {
     if (n.kind !== "api") continue;
-    const implementers = index.incoming(n.id, "exposes").map((e) => name(e.source));
+    const implementers = index.incoming(n.id, "exposes").map((e) => {
+      const ops = e.data.operations
+        .map((id) => n.data.operations.find((o) => o.id === id)?.name)
+        .filter(Boolean);
+      return `${name(e.source)}${ops.length > 0 ? ` (${ops.join(", ")})` : ""}`;
+    });
     const consumers = index.incoming(n.id, "calls").map((e) => name(e.source));
     const meta = [
       n.data.style,
@@ -466,7 +471,16 @@ function nodeRelations(index: DesignIndex, n: DesignNode): string[] {
     ),
     group(
       "Exposes",
-      index.outgoing(n.id, "exposes").map((e) => name(e.target)),
+      index.outgoing(n.id, "exposes").map((e) => {
+        const api = index.node(e.target);
+        const ops =
+          api?.kind === "api"
+            ? e.data.operations
+                .map((id) => api.data.operations.find((o) => o.id === id)?.name)
+                .filter(Boolean)
+            : [];
+        return `${name(e.target)}${ops.length > 0 ? ` (${ops.join(", ")})` : ""}`;
+      }),
     ),
     group(
       "Accesses",

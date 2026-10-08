@@ -36,7 +36,9 @@ import { toast } from "sonner";
 import { CanvasActionsProvider, type CanvasActions } from "@/components/designer/canvas-actions";
 import { EdgeKindMenu, type EdgeKindMenuState } from "@/components/designer/edge-kind-menu";
 import { edgeTypes } from "@/components/designer/edges/design-edge";
+import { EndpointsPanel } from "@/components/designer/endpoints-panel";
 import { Inspector } from "@/components/designer/inspector/inspector";
+import { LevelBreadcrumb } from "@/components/designer/level-breadcrumb";
 import { KIND_STYLE } from "@/components/designer/nodes/kind-style";
 import { nodeTypes } from "@/components/designer/nodes";
 import { DRAG_MIME, Palette } from "@/components/designer/palette";
@@ -72,7 +74,9 @@ import {
   findContainerFor,
   findDropParent,
   subtreeIds,
+  type Point,
 } from "@/lib/design/geometry";
+import { isFocusable, levelOf, levelView, type LevelView } from "@/lib/design/levels";
 import { NODE_KINDS, type EdgeKind, type NodeKind } from "@/lib/design/schema";
 import { useCanvasUi } from "@/stores/canvas-ui-store";
 import { useSelection } from "@/stores/selection-store";
@@ -101,6 +105,14 @@ function readViewport(slug: string): Viewport | null {
   }
 }
 
+/** The levels view for the current UI state, or undefined in the "all" view. */
+function viewFor(
+  doc: Parameters<typeof levelView>[0],
+  ui: { viewMode: string; focusId: string | null },
+): LevelView | undefined {
+  return ui.viewMode === "levels" ? levelView(doc, ui.focusId) : undefined;
+}
+
 function useIsWide() {
   return useSyncExternalStore(
     (notify) => {
@@ -122,6 +134,12 @@ function Flow({ wide }: { wide: boolean }) {
   const minimapOpen = useCanvasUi((s) => s.minimapOpen);
   const validationOpen = useCanvasUi((s) => s.validationOpen);
   const document = useDesigner((s) => s.document);
+  const viewMode = useCanvasUi((s) => s.viewMode);
+  const focusId = useCanvasUi((s) => s.focusId);
+  const view = useMemo(
+    () => viewFor(document, { viewMode, focusId }),
+    [document, viewMode, focusId],
+  );
 
   const wrapper = useRef<HTMLDivElement>(null);
   const pointer = useRef({ x: 0, y: 0 });
@@ -134,7 +152,8 @@ function Flow({ wide }: { wide: boolean }) {
 
   const [initial] = useState(() => {
     const doc = store.getState().document;
-    return { nodes: toFlowNodes(doc, {}, NONE), edges: toFlowEdges(doc, NONE) };
+    const v = viewFor(doc, useCanvasUi.getState());
+    return { nodes: toFlowNodes(doc, {}, NONE, v), edges: toFlowEdges(doc, NONE, v) };
   });
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>(initial.edges);
@@ -142,8 +161,8 @@ function Flow({ wide }: { wide: boolean }) {
   // Store → canvas: rebuild when the document or statuses change.
   useEffect(() => {
     const selection = useSelection.getState();
-    setNodes((previous) => keepMeasured(toFlowNodes(document, statuses, NONE), previous));
-    setEdges(toFlowEdges(document, NONE));
+    setNodes((previous) => keepMeasured(toFlowNodes(document, statuses, NONE, view), previous));
+    setEdges(toFlowEdges(document, NONE, view));
     // Selection ids that no longer exist must not linger in the inspector.
     const ids = new Set(document.nodes.map((n) => n.id));
     const edgeIds = new Set(document.edges.map((e) => e.id));
@@ -151,7 +170,28 @@ function Flow({ wide }: { wide: boolean }) {
       selection.nodeIds.filter((id) => ids.has(id)),
       selection.edgeIds.filter((id) => edgeIds.has(id)),
     );
-  }, [document, statuses, setNodes, setEdges]);
+  }, [document, statuses, view, setNodes, setEdges]);
+
+  // Changing level frames the new view; going back to "all" restores its saved viewport.
+  const viewKey = view ? `levels:${view.focus?.id ?? ""}` : "all";
+  const shownViewKey = useRef(viewKey);
+  /** Set by focus() when it centres a node itself right after switching level. */
+  const skipFit = useRef(false);
+  useEffect(() => {
+    if (shownViewKey.current === viewKey) return;
+    shownViewKey.current = viewKey;
+    if (skipFit.current) {
+      skipFit.current = false;
+      return;
+    }
+    // Wait a frame so React Flow has measured the new nodes.
+    const timer = window.setTimeout(() => {
+      const saved = viewKey === "all" ? readViewport(slug) : null;
+      if (saved) void rf.setViewport(saved, { duration: 200 });
+      else void rf.fitView({ duration: 200, padding: 0.15, maxZoom: 1.25 });
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [viewKey, rf, slug]);
 
   // The selection store is the single source of truth: React Flow only ever sees `selected`
   // derived from it, and user clicks come back through onNodesChange/onEdgesChange "select"
@@ -212,7 +252,12 @@ function Flow({ wide }: { wide: boolean }) {
     const sel = useSelection.getState();
     setNodes((prev) =>
       keepMeasured(
-        toFlowNodes(doc, useStatusStore.getState().statuses, new Set(sel.nodeIds)),
+        toFlowNodes(
+          doc,
+          useStatusStore.getState().statuses,
+          new Set(sel.nodeIds),
+          viewFor(doc, useCanvasUi.getState()),
+        ),
         prev,
       ),
     );
@@ -230,11 +275,27 @@ function Flow({ wide }: { wide: boolean }) {
       const doc = store.getState().document;
       const current = doc.nodes.find((n) => n.id === node.id);
       if (!current) return;
+      const v = viewFor(doc, useCanvasUi.getState());
+      // At project level containers are collapsed, so nothing can be dropped into them.
+      if (v && !v.focus) return;
       const rect = absoluteRect(doc, node.id);
-      const target = findDropParent(doc, node.id, {
+      let target = findDropParent(doc, node.id, {
         x: rect.x + rect.width / 2,
         y: rect.y + rect.height / 2,
       });
+      if (v?.focus) {
+        // Inside a container the drop stays inside it: dropped anywhere else, the node goes to
+        // the focused container itself.
+        if (target === null || !subtreeIds(doc, v.focus.id).has(target)) target = v.focus.id;
+        if (target === current.parentId) return;
+        if (!canContain(doc.nodes.find((n) => n.id === target)!.kind, current.kind)) {
+          toast.error(`A ${NODE_KIND_META[current.kind].label.toLowerCase()} can't go there`);
+          resetFromStore();
+          return;
+        }
+        state.setParent(node.id, target);
+        return;
+      }
       if (target === current.parentId) return;
       if (target === null && !canContain(null, current.kind)) {
         toast.error(
@@ -331,12 +392,35 @@ function Flow({ wide }: { wide: boolean }) {
   );
 
   // ── Adding ──────────────────────────────────────────────────────────────
+  /** Flow-space point → document (absolute) coordinates: they differ inside a level. */
+  const toAbsolute = useCallback(
+    (p: Point): Point => {
+      const v = viewFor(store.getState().document, useCanvasUi.getState());
+      return v ? { x: p.x + v.origin.x, y: p.y + v.origin.y } : p;
+    },
+    [store],
+  );
+
+  /** `center` is in document (absolute) coordinates. */
   const addNodeAt = useCallback(
-    (kind: NodeKind, center: { x: number; y: number }, forcedParent?: string | null) => {
+    (kind: NodeKind, center: Point, forcedParent?: string | null) => {
       const meta = NODE_KIND_META[kind];
       const doc = store.getState().document;
-      const parentId =
-        forcedParent !== undefined ? forcedParent : findContainerFor(doc, kind, center);
+      const ui = useCanvasUi.getState();
+      const v = viewFor(doc, ui);
+      if (v?.focus?.kind === "module") {
+        toast.error("Go up a level to add components");
+        return;
+      }
+      let parentId: string | null;
+      if (forcedParent !== undefined) parentId = forcedParent;
+      else if (v && !v.focus)
+        parentId = null; // project level: containers are collapsed
+      else {
+        parentId = findContainerFor(doc, kind, center);
+        if (v?.focus && (parentId === null || !subtreeIds(doc, v.focus.id).has(parentId)))
+          parentId = v.focus.id;
+      }
       if (
         !canContain(
           parentId ? (doc.nodes.find((n) => n.id === parentId)?.kind ?? null) : null,
@@ -361,6 +445,9 @@ function Flow({ wide }: { wide: boolean }) {
         .addNode(kind, { x: topLeft.x - origin.x, y: topLeft.y - origin.y }, parentId);
       useSelection.getState().set([id], []);
       useSelection.getState().requestNameFocus(id);
+      // Drill into the parent when the new node would be hidden in the current level.
+      if (v && parentId && !(v.focus && subtreeIds(doc, v.focus.id).has(parentId)))
+        ui.setFocus(parentId);
     },
     [store],
   );
@@ -369,17 +456,22 @@ function Flow({ wide }: { wide: boolean }) {
     (kind: NodeKind) => {
       const box = wrapper.current?.getBoundingClientRect();
       if (!box) return;
-      const center = rf.screenToFlowPosition({
-        x: box.left + box.width / 2,
-        y: box.top + box.height / 2,
-      });
+      const center = toAbsolute(
+        rf.screenToFlowPosition({
+          x: box.left + box.width / 2,
+          y: box.top + box.height / 2,
+        }),
+      );
       const doc = store.getState().document;
+      const v = viewFor(doc, useCanvasUi.getState());
       if (!canContain(null, kind)) {
         // Layers and modules go inside the selected service/layer.
         const selected = useSelection.getState().nodeIds;
         const parent =
           selected.length === 1 ? doc.nodes.find((n) => n.id === selected[0]) : undefined;
         if (!parent || !canContain(parent.kind, kind)) {
+          // Inside a level, the focused container takes it.
+          if (v?.focus && v.focus.kind !== "module") return addNodeAt(kind, center);
           toast.error(
             `Select a ${NODE_KIND_META[kind].parents.filter(Boolean).join(" or ")} first`,
           );
@@ -397,9 +489,9 @@ function Flow({ wide }: { wide: boolean }) {
           parent.id,
         );
       }
-      addNodeAt(kind, center, null);
+      addNodeAt(kind, center, v?.focus ? undefined : null);
     },
-    [rf, store, addNodeAt],
+    [rf, store, addNodeAt, toAbsolute],
   );
 
   const onDrop = useCallback(
@@ -407,15 +499,44 @@ function Flow({ wide }: { wide: boolean }) {
       const kind = event.dataTransfer.getData(DRAG_MIME) as NodeKind;
       if (!NODE_KINDS.includes(kind)) return;
       event.preventDefault();
-      addNodeAt(kind, rf.screenToFlowPosition({ x: event.clientX, y: event.clientY }));
+      addNodeAt(kind, toAbsolute(rf.screenToFlowPosition({ x: event.clientX, y: event.clientY })));
     },
-    [rf, addNodeAt],
+    [rf, addNodeAt, toAbsolute],
   );
 
   // ── Actions exposed to the palette, inspector and validation panel ────────
   const focus = useCallback(
     ({ nodeId, edgeId }: { nodeId?: string; edgeId?: string }) => {
       const doc = store.getState().document;
+      const ui = useCanvasUi.getState();
+      if (ui.viewMode === "levels") {
+        const edge = edgeId ? doc.edges.find((e) => e.id === edgeId) : undefined;
+        const wanted = nodeId ? [nodeId] : edge ? [edge.source, edge.target] : [];
+        if (!wanted.every((id) => doc.nodes.some((n) => n.id === id)) || wanted.length === 0)
+          return;
+        const v = viewFor(doc, ui)!;
+        const shown = (id: string) =>
+          v.inside.some((i) => i.node.id === id) || v.context.some((c) => c.node.id === id);
+        if (!wanted.every(shown)) {
+          skipFit.current = true;
+          ui.setFocus(levelOf(doc, wanted[0]!));
+        }
+        // Centre on what React Flow actually drew once the level has rendered.
+        window.setTimeout(() => {
+          const boxes = wanted
+            .map((id) => rf.getInternalNode(id))
+            .filter((n) => n !== undefined)
+            .map((n) => ({
+              x: n.internals.positionAbsolute.x + (n.measured.width ?? 0) / 2,
+              y: n.internals.positionAbsolute.y + (n.measured.height ?? 0) / 2,
+            }));
+          if (boxes.length === 0) return;
+          const x = boxes.reduce((t, b) => t + b.x, 0) / boxes.length;
+          const y = boxes.reduce((t, b) => t + b.y, 0) / boxes.length;
+          void rf.setCenter(x, y, { zoom: Math.max(rf.getZoom(), 1), duration: 300 });
+        }, 50);
+        return;
+      }
       let point: { x: number; y: number } | null = null;
       if (nodeId && doc.nodes.some((n) => n.id === nodeId)) {
         const r = absoluteRect(doc, nodeId);
@@ -439,7 +560,7 @@ function Flow({ wide }: { wide: boolean }) {
 
   const current: CanvasActions = {
     addNodeAtCenter,
-    addNodeAt: (kind, center) => addNodeAt(kind, center),
+    addNodeAt: (kind, center) => addNodeAt(kind, toAbsolute(center)),
     focus,
     deleteSelection: () => {
       const sel = useSelection.getState();
@@ -479,6 +600,13 @@ function Flow({ wide }: { wide: boolean }) {
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onNodeDragStop={onNodeDragStop}
+            onNodeDoubleClick={(_, node) => {
+              const n = node.data.node;
+              // Drill into containers and modules; a context node opens the level that shows it.
+              if (isFocusable(n)) useCanvasUi.getState().setFocus(n.id);
+              else if (node.data.context !== undefined)
+                useCanvasUi.getState().setFocus(levelOf(store.getState().document, n.id));
+            }}
             onBeforeDelete={onBeforeDelete}
             onDelete={onDelete}
             onConnect={onConnect}
@@ -499,11 +627,13 @@ function Flow({ wide }: { wide: boolean }) {
             snapGrid={SNAP}
             deleteKeyCode={["Backspace", "Delete"]}
             multiSelectionKeyCode="Shift"
-            defaultViewport={savedViewport ?? undefined}
-            fitView={!savedViewport}
+            defaultViewport={(!view && savedViewport) || undefined}
+            fitView={!!view || !savedViewport}
             fitViewOptions={{ padding: 0.15 }}
             minZoom={0.1}
             onMoveEnd={(_, viewport) => {
+              // Only the "all" view keeps its viewport; levels are framed when opened.
+              if (useCanvasUi.getState().viewMode !== "all") return;
               try {
                 window.localStorage.setItem(viewportKey(slug), JSON.stringify(viewport));
               } catch {
@@ -515,16 +645,22 @@ function Flow({ wide }: { wide: boolean }) {
           >
             <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
             {minimapOpen && (
-              <MiniMap
+              <MiniMap<FlowNode>
                 pannable
                 zoomable
-                nodeColor={(n) => KIND_STYLE[n.type as NodeKind]?.hex ?? "#888"}
+                nodeColor={(n) => KIND_STYLE[n.data.node.kind]?.hex ?? "#888"}
               />
             )}
             <Controls position="top-right" showInteractive={false} />
-            <Panel position="top-left">
+            <Panel position="top-left" className="flex items-center gap-2">
               <Toolbar />
+              {view && <LevelBreadcrumb focusId={view.focus?.id ?? null} />}
             </Panel>
+            {view?.focus?.kind === "module" && (
+              <Panel position="top-right" className="mr-14!">
+                <EndpointsPanel focus={view.focus} />
+              </Panel>
+            )}
             {validationOpen && (
               <Panel position="bottom-left">
                 <ValidationPanel />

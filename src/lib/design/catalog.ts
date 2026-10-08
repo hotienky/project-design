@@ -155,7 +155,10 @@ export const EDGE_KIND_META: Record<EdgeKind, EdgeKindMeta> = {
     label: "exposes",
     from: ["service", "module"],
     to: ["api"],
-    description: "Source implements and serves the target API contract.",
+    description:
+      "Source implements and serves the target API contract. data.operations lists the target " +
+      "API operation ids this source implements, e.g. one controller's endpoints (empty = the " +
+      "whole API).",
   },
   accesses: {
     label: "accesses",

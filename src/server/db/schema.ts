@@ -1,9 +1,9 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  customType,
   index,
   integer,
-  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -12,7 +12,22 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import type { DesignDocument } from "@/lib/design/schema";
+import { DesignDocumentSchema, type DesignDocument } from "@/lib/design/schema";
+
+/**
+ * A design document in a jsonb column. Writes are validated by the services (safeParseDesign);
+ * reads go through the schema again so rows stored before a schema change get its new defaults
+ * (e.g. an edge's `operations: []`). A row that no longer parses is returned as stored.
+ */
+const designDocument = customType<{ data: DesignDocument; driverData: unknown }>({
+  dataType: () => "jsonb",
+  toDriver: (value) => JSON.stringify(value),
+  fromDriver(value) {
+    const raw: unknown = typeof value === "string" ? JSON.parse(value) : value;
+    const parsed = DesignDocumentSchema.safeParse(raw);
+    return parsed.success ? parsed.data : (raw as DesignDocument);
+  },
+});
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 const updatedAt = () => timestamp("updated_at", { withTimezone: true }).notNull().defaultNow();
@@ -25,7 +40,7 @@ export const projects = pgTable(
     slug: text("slug").notNull().unique(),
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
-    document: jsonb("document").$type<DesignDocument>().notNull(),
+    document: designDocument("document").notNull(),
     revision: integer("revision").notNull().default(1),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -44,7 +59,7 @@ export const projectVersions = pgTable(
     version: integer("version").notNull(),
     label: text("label").notNull().default(""),
     notes: text("notes").notNull().default(""),
-    document: jsonb("document").$type<DesignDocument>().notNull(),
+    document: designDocument("document").notNull(),
     sourceRevision: integer("source_revision").notNull(),
     createdAt: createdAt(),
   },

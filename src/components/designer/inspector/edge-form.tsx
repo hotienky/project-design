@@ -14,13 +14,50 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { allowedEdgeKinds, EDGE_KIND_META } from "@/lib/design/catalog";
-import { EdgeSchema, type DesignEdge, type EdgeKind } from "@/lib/design/schema";
+import { EdgeSchema, type DesignEdge, type EdgeKind, type NodeOfKind } from "@/lib/design/schema";
 import { useSelection } from "@/stores/selection-store";
 
 const PROTOCOLS = ["http", "grpc", "graphql", "websocket", "in-process", "other"] as const;
 const MODES = ["read", "write", "read-write"] as const;
 const CARDINALITIES = ["one-to-one", "one-to-many", "many-to-many"] as const;
 const ON_DELETE = ["no-action", "cascade", "restrict", "set-null"] as const;
+
+/** Checklist of an API's operations, for `calls` and `exposes` edges. */
+function OperationsField({
+  api,
+  value,
+  hint,
+  onChange,
+}: {
+  api: NodeOfKind<"api">;
+  value: string[];
+  hint: string;
+  onChange: (operations: string[]) => void;
+}) {
+  return (
+    <Field label="Operations" hint={hint}>
+      <ul className="grid gap-1.5">
+        {api.data.operations.map((op) => (
+          <li key={op.id} className="flex items-center gap-2">
+            <Checkbox
+              id={`op-${op.id}`}
+              checked={value.includes(op.id)}
+              onCheckedChange={(on) =>
+                onChange(on ? [...value, op.id] : value.filter((x) => x !== op.id))
+              }
+            />
+            <Label htmlFor={`op-${op.id}`} className="font-mono text-xs">
+              {op.name}
+            </Label>
+          </li>
+        ))}
+        {api.data.operations.length === 0 && (
+          <li className="text-sm text-muted-foreground">The API has no operations yet.</li>
+        )}
+      </ul>
+    </Field>
+  );
+}
 
 export function EdgeForm({ edge }: { edge: DesignEdge }) {
   const store = useDesignerStore();
@@ -96,8 +133,13 @@ export function EdgeForm({ edge }: { edge: DesignEdge }) {
         {edge.kind === "depends_on" && (
           <p className="text-sm text-muted-foreground">No extra settings.</p>
         )}
-        {edge.kind === "exposes" && (
-          <p className="text-sm text-muted-foreground">No extra settings.</p>
+        {edge.kind === "exposes" && target?.kind === "api" && (
+          <OperationsField
+            api={target}
+            value={edge.data.operations}
+            hint="The endpoints this component implements, e.g. one controller's actions. Leave all unchecked if it implements the whole API."
+            onChange={(operations) => setData({ operations })}
+          />
         )}
         {edge.kind === "calls" && (
           <>
@@ -108,39 +150,12 @@ export function EdgeForm({ edge }: { edge: DesignEdge }) {
               onChange={(protocol) => setData({ protocol })}
             />
             {target?.kind === "api" && (
-              <Field
-                label="Operations"
+              <OperationsField
+                api={target}
+                value={edge.data.operations}
                 hint="Leave all unchecked if the caller uses the whole API."
-              >
-                <ul className="grid gap-1.5">
-                  {target.data.operations.map((op) => {
-                    const checked = edge.data.operations.includes(op.id);
-                    return (
-                      <li key={op.id} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`op-${op.id}`}
-                          checked={checked}
-                          onCheckedChange={(on) =>
-                            setData({
-                              operations: on
-                                ? [...edge.data.operations, op.id]
-                                : edge.data.operations.filter((x) => x !== op.id),
-                            })
-                          }
-                        />
-                        <Label htmlFor={`op-${op.id}`} className="font-mono text-xs">
-                          {op.name}
-                        </Label>
-                      </li>
-                    );
-                  })}
-                  {target.data.operations.length === 0 && (
-                    <li className="text-sm text-muted-foreground">
-                      The API has no operations yet.
-                    </li>
-                  )}
-                </ul>
-              </Field>
+                onChange={(operations) => setData({ operations })}
+              />
             )}
           </>
         )}

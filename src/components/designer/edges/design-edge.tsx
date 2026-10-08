@@ -83,7 +83,9 @@ export function DesignEdgeView({ id, source, target, data, selected }: EdgeProps
   });
   const style = STYLE[data.edge.kind];
   const stroke = selected ? "var(--primary)" : style.stroke;
-  const marker = `pd-arrow-${id}`;
+  // Lifted edge ids contain ":", which doesn't belong in a url(#…) reference.
+  const marker = `pd-arrow-${id.replace(/[^A-Za-z0-9_-]/g, "_")}`;
+  const lifted = data.lifted ?? 0;
   return (
     <>
       <defs>
@@ -108,6 +110,8 @@ export function DesignEdgeView({ id, source, target, data, selected }: EdgeProps
           stroke,
           strokeWidth: style.width + (selected ? 1 : 0),
           ...(style.dash ? { strokeDasharray: style.dash } : {}),
+          // Lifted edges are derived from nested ones: drawn fainter, never edited.
+          ...(lifted ? { opacity: 0.55 } : {}),
         }}
       />
       <circle
@@ -120,6 +124,11 @@ export function DesignEdgeView({ id, source, target, data, selected }: EdgeProps
       />
       <EdgeLabelRenderer>
         <div
+          title={
+            lifted
+              ? `${lifted} connection${lifted === 1 ? "" : "s"} from nested components`
+              : undefined
+          }
           className="nodrag nopan pointer-events-auto absolute rounded-full border bg-background px-2 py-0.5 text-[10px] leading-none font-medium shadow-xs"
           style={{
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
@@ -128,6 +137,7 @@ export function DesignEdgeView({ id, source, target, data, selected }: EdgeProps
           }}
         >
           {data.caption}
+          {lifted > 1 && ` ×${lifted}`}
         </div>
       </EdgeLabelRenderer>
     </>

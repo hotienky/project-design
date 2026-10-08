@@ -27,6 +27,28 @@ describe("document edits keep the design valid", () => {
     expect(checkIntegrity(next)).toEqual([]);
   });
 
+  it("removeOperation clears exposes edges", () => {
+    const withSubset = parseDesign({
+      ...teamTasksDesign,
+      edges: teamTasksDesign.edges!.map((e) =>
+        e.id === "e_api_exposes" ? { ...e, data: { operations: ["op_list", "op_create"] } } : e,
+      ),
+    });
+    const next = removeOperation(withSubset, "api_rest", "op_create");
+    const edge = next.edges.find((e) => e.id === "e_api_exposes");
+    expect(edge?.kind === "exposes" && edge.data.operations).toEqual(["op_list"]);
+    expect(checkIntegrity(next)).toEqual([]);
+    const unknown = checkIntegrity({
+      ...next,
+      edges: next.edges.map((e) =>
+        e.id === "e_api_exposes" && e.kind === "exposes"
+          ? { ...e, data: { operations: ["op_gone"] } }
+          : e,
+      ),
+    });
+    expect(unknown.map((i) => i.code)).toEqual(["edge.unknown_operation"]);
+  });
+
   it("removeChannel resets edges to any channel", () => {
     const next = removeChannel(doc(), "que_events", "ch_assigned");
     const edge = next.edges.find((e) => e.id === "e_repo_pub");

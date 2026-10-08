@@ -271,3 +271,63 @@ test("keyboard shortcuts undo, redo and save", async ({ page }) => {
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   await expect.poll(async () => (await getDoc(page)).document.nodes.length).toBe(1);
 });
+
+test("levels view drills from project to service to a controller's endpoints", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  page.on("pageerror", (e) => errors.push(e.message));
+  const document = {
+    ...teamTasksDesign,
+    edges: [
+      ...teamTasksDesign.edges!,
+      {
+        id: "e_routes_exposes",
+        kind: "exposes",
+        source: "mod_routes",
+        target: "api_rest",
+        data: { operations: ["op_list", "op_create"] },
+      },
+    ],
+  };
+  await withDb((db) =>
+    createProject(db, { name: "Drill down", slug: "levels", document: document as never }),
+  );
+  await page.setViewportSize({ width: 1700, height: 1000 });
+  await page.goto("/projects/levels");
+  const nodes = page.locator(".react-flow__node");
+  const node = (id: string) => page.locator(`.react-flow__node[data-id="${id}"]`);
+  await expect(nodes).toHaveCount(teamTasksDesign.nodes!.length);
+
+  // Project level: top-level nodes only, the API service collapsed to a summary card.
+  await page.getByRole("button", { name: /^Levels/ }).click();
+  const topLevel = teamTasksDesign.nodes!.filter((n) => !n.parentId).length;
+  await expect(nodes).toHaveCount(topLevel);
+  await expect(node("svc_api")).toContainText("4 inside");
+  await expect(page.getByRole("navigation", { name: "Level" })).toContainText("Project");
+
+  // Service level: layers and modules, plus the datastore and queue it talks to.
+  await node("svc_api").dblclick();
+  await expect(node("lyr_http")).toBeVisible();
+  await expect(node("mod_routes")).toBeVisible();
+  await expect(node("dst_pg").locator("[data-context]")).toBeVisible();
+  await expect(node("dst_pg")).toContainText("Main database");
+  await expect(node("svc_web")).toHaveCount(0);
+
+  // Module level: the controller's endpoints.
+  await page.getByRole("button", { name: "Open Task routes" }).click();
+  const endpoints = page.getByRole("region", { name: "Endpoints" });
+  await expect(endpoints).toContainText("listTasks");
+  await expect(endpoints).toContainText("createTask");
+  await expect(endpoints).not.toContainText("completeTask");
+  await expect(page.getByRole("navigation", { name: "Level" })).toContainText("API");
+
+  // Back up through the breadcrumb, then back to everything.
+  await page
+    .getByRole("navigation", { name: "Level" })
+    .getByRole("button", { name: "Project" })
+    .click();
+  await expect(nodes).toHaveCount(topLevel);
+  await page.getByRole("button", { name: /^All/ }).click();
+  await expect(nodes).toHaveCount(teamTasksDesign.nodes!.length);
+  expect(errors).toEqual([]);
+});

@@ -27,6 +27,18 @@ describe("renderBrief", () => {
     expect(brief).toContain("status: done");
   });
 
+  it("names the operations an exposes edge implements", () => {
+    const withSubset = parseDesign({
+      ...teamTasksDesign,
+      edges: teamTasksDesign.edges!.map((e) =>
+        e.id === "e_api_exposes" ? { ...e, data: { operations: ["op_list", "op_create"] } } : e,
+      ),
+    });
+    const brief = renderBrief({ project, document: withSubset, revision: 1, version: null });
+    expect(brief).toContain("implemented by: API (listTasks, createTask)");
+    expect(brief).toMatch(/Exposes.*Tasks REST API \(listTasks, createTask\)/);
+  });
+
   it("is deterministic and leaves out empty sections", () => {
     const empty = parseDesign({ schemaVersion: 1 });
     const a = renderBrief({ project, document: empty, revision: 1, version: null });

@@ -349,7 +349,13 @@ export const EdgeSchema = z.discriminatedUnion("kind", [
       operations: z.array(IdSchema).max(300).default([]),
     }),
   ),
-  edge("exposes", z.object({})),
+  edge(
+    "exposes",
+    z.object({
+      /** Operation ids on the target API this source implements; empty = the whole API. */
+      operations: z.array(IdSchema).max(300).default([]),
+    }),
+  ),
   edge(
     "accesses",
     z.object({ mode: z.enum(["read", "write", "read-write"]).default("read-write") }),

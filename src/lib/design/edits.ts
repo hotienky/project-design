@@ -5,7 +5,7 @@
  */
 import { subtreeIds } from "@/lib/design/geometry";
 import { newEdgeId, newItemId, newNodeId } from "@/lib/design/ids";
-import type { DesignDocument, DesignNode, Field, TypeShape } from "@/lib/design/schema";
+import type { DesignDocument, DesignEdge, DesignNode, Field, TypeShape } from "@/lib/design/schema";
 import { getServiceTemplate } from "@/lib/design/service-templates";
 
 const mapNode = (doc: DesignDocument, id: string, fn: (n: DesignNode) => DesignNode) => ({
@@ -13,7 +13,7 @@ const mapNode = (doc: DesignDocument, id: string, fn: (n: DesignNode) => DesignN
   nodes: doc.nodes.map((n) => (n.id === id ? fn(n) : n)),
 });
 
-/** Removes an API operation and the `calls` edges' references to it. */
+/** Removes an API operation and the `calls`/`exposes` edges' references to it. */
 export function removeOperation(doc: DesignDocument, apiId: string, opId: string): DesignDocument {
   const next = mapNode(doc, apiId, (n) =>
     n.kind === "api"
@@ -23,8 +23,13 @@ export function removeOperation(doc: DesignDocument, apiId: string, opId: string
   return {
     ...next,
     edges: next.edges.map((e) =>
-      e.kind === "calls" && e.target === apiId && e.data.operations.includes(opId)
-        ? { ...e, data: { ...e.data, operations: e.data.operations.filter((o) => o !== opId) } }
+      (e.kind === "calls" || e.kind === "exposes") &&
+      e.target === apiId &&
+      e.data.operations.includes(opId)
+        ? ({
+            ...e,
+            data: { ...e.data, operations: e.data.operations.filter((o) => o !== opId) },
+          } as DesignEdge)
         : e,
     ),
   };

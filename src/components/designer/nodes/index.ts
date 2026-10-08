@@ -5,9 +5,13 @@ import {
   ContainerNode,
   EntityNode,
   NoteNode,
+  SummaryNode,
 } from "@/components/designer/nodes/base-node";
 
-/** React Flow node types, keyed by design node kind. Defined once (a stable reference). */
+/**
+ * React Flow node types, keyed by design node kind, plus "summary" for the levels view's
+ * collapsed containers and context nodes. Defined once (a stable reference).
+ */
 export const nodeTypes = {
   service: ContainerNode,
   layer: ContainerNode,
@@ -19,4 +23,5 @@ export const nodeTypes = {
   actor: CardNode,
   entity: EntityNode,
   note: NoteNode,
+  summary: SummaryNode,
 } satisfies NodeTypes;

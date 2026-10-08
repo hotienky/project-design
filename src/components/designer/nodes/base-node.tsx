@@ -2,6 +2,7 @@
 
 import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react";
 import {
+  ChevronRight,
   GripVertical,
   KeyRound,
   ListChecks,
@@ -17,11 +18,14 @@ import {
 import { KIND_STYLE, NOTE_COLORS, STATUS_STYLE } from "@/components/designer/nodes/kind-style";
 import { useDesignerStore } from "@/components/designer/store-provider";
 import type { FlowNode } from "@/components/designer/to-flow";
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NODE_KIND_META } from "@/lib/design/catalog";
 import { cardMetrics, ENTITY_FIELD_ROWS, type CardMetric } from "@/lib/design/geometry";
 import type { DesignNode } from "@/lib/design/schema";
+import { isFocusable } from "@/lib/design/levels";
 import { cn } from "@/lib/utils";
+import { useCanvasUi } from "@/stores/canvas-ui-store";
 
 const SIDES = [
   ["top", Position.Top],
@@ -166,8 +170,8 @@ function IconTile({ kind, small }: { kind: DesignNode["kind"]; small?: boolean }
 }
 
 /** Icon tile, name and a muted subtitle (the kind's label when there's nothing more specific). */
-function Title({ node }: { node: DesignNode }) {
-  const subtitle = subtitleOf(node) || NODE_KIND_META[node.kind].label;
+function Title({ node, subtitle: override }: { node: DesignNode; subtitle?: string }) {
+  const subtitle = override || subtitleOf(node) || NODE_KIND_META[node.kind].label;
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
       <IconTile kind={node.kind} />
@@ -199,6 +203,25 @@ function ContainerTitle({ node }: { node: DesignNode }) {
   );
 }
 
+/** Drills the levels view into a node. */
+function OpenButton({ node }: { node: DesignNode }) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon-xs"
+      className="nodrag shrink-0"
+      aria-label={`Open ${node.name}`}
+      title={`Open ${node.name}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        useCanvasUi.getState().setFocus(node.id);
+      }}
+    >
+      <ChevronRight />
+    </Button>
+  );
+}
+
 const card =
   "group/node w-52 rounded-xl border bg-card p-2.5 shadow-[0_1px_3px_0_rgb(0_0_0/0.04)] transition-shadow hover:shadow-md";
 
@@ -213,11 +236,14 @@ function Grip() {
 
 /** Leaf node: module, api, integration, queue, actor. */
 export function CardNode({ data, selected }: NodeProps<FlowNode>) {
+  // In the levels view a module can be opened, unless it's the one already open.
+  const openable = useCanvasUi((s) => s.viewMode === "levels" && s.focusId !== data.node.id);
   return (
     <div data-selected={selected} className={cn(card, selected && selectedRing)}>
       <Handles kind={data.node.kind} />
       <div className="flex items-start gap-1">
         <Title node={data.node} />
+        {openable && isFocusable(data.node) && <OpenButton node={data.node} />}
         <Grip />
       </div>
       <Chips data={data} className="mt-2" />
@@ -289,6 +315,7 @@ export function NoteNode({ data, selected }: NodeProps<FlowNode>) {
 /** Resizable group node: service, layer, datastore. Children are separate nodes drawn above it. */
 export function ContainerNode({ id, data, selected }: NodeProps<FlowNode>) {
   const store = useDesignerStore();
+  const levels = useCanvasUi((s) => s.viewMode === "levels");
   const style = KIND_STYLE[data.node.kind];
   return (
     <div
@@ -316,7 +343,41 @@ export function ContainerNode({ id, data, selected }: NodeProps<FlowNode>) {
       <div className="flex items-center gap-2 px-2 py-1">
         <ContainerTitle node={data.node} />
         <Chips data={data} className="justify-end" />
+        {levels && <OpenButton node={data.node} />}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Levels view card: a collapsed container ("4 inside") or a read-only context node outside the
+ * focus, subtitled with its path. Both drill in on Open / double-click.
+ */
+export function SummaryNode({ data, selected }: NodeProps<FlowNode>) {
+  const { node, collapsed, context } = data;
+  return (
+    <div
+      data-selected={selected}
+      data-context={context !== undefined || undefined}
+      className={cn(
+        card,
+        context !== undefined && "border-dashed bg-card/70 shadow-none",
+        selected && selectedRing,
+      )}
+    >
+      <Handles kind={node.kind} />
+      <div className="flex items-start gap-1">
+        <Title node={node} subtitle={context} />
+        {isFocusable(node) && <OpenButton node={node} />}
+      </div>
+      {collapsed !== undefined ? (
+        <div className="mt-2 flex flex-wrap items-center gap-1">
+          <span className={cn(chip, "text-foreground/80")}>{collapsed} inside</span>
+          {data.status && <StatusChip status={data.status} />}
+        </div>
+      ) : (
+        <Chips data={data} className="mt-2" />
+      )}
     </div>
   );
 }

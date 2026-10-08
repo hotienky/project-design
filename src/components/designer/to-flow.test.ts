@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { keepMeasured, toFlowEdges, toFlowNodes } from "@/components/designer/to-flow";
 import { teamTasksDesign } from "@/lib/design/examples/team-tasks";
 import { parseDesign } from "@/lib/design/integrity";
+import { levelView } from "@/lib/design/levels";
 
 const doc = parseDesign(teamTasksDesign);
 
@@ -69,5 +70,37 @@ describe("toFlowEdges", () => {
       .filter((e) => e.animated)
       .map((e) => e.id);
     expect(animated.sort()).toEqual(["e_notifier_sub", "e_repo_pub"]);
+  });
+});
+
+describe("levels view", () => {
+  it("maps collapsed containers and context nodes to summary cards", () => {
+    const project = toFlowNodes(doc, {}, new Set(), levelView(doc, null));
+    const api = project.find((n) => n.id === "svc_api")!;
+    expect([api.type, api.data.collapsed, api.width]).toEqual(["summary", 4, undefined]);
+    expect(project.some((n) => n.id === "lyr_http")).toBe(false);
+
+    const service = toFlowNodes(doc, {}, new Set(), levelView(doc, "svc_api"));
+    const http = service.find((n) => n.id === "lyr_http")!;
+    expect([http.type, http.parentId]).toEqual(["layer", undefined]);
+    const db = service.find((n) => n.id === "dst_pg")!;
+    expect([db.type, db.draggable, db.deletable, db.data.context]).toEqual([
+      "summary",
+      false,
+      false,
+      "Main database",
+    ]);
+  });
+
+  it("marks lifted edges read-only and leaves real ones alone", () => {
+    const edges = toFlowEdges(doc, new Set(), levelView(doc, null));
+    const lifted = edges.find((e) => e.id === "lift:accesses:svc_api:dst_pg")!;
+    expect([lifted.selectable, lifted.deletable, lifted.data?.lifted]).toEqual([false, false, 1]);
+    const real = edges.find((e) => e.id === "e_api_exposes")!;
+    expect([real.selectable, real.data?.lifted]).toEqual([undefined, undefined]);
+  });
+
+  it("without a view the output is unchanged", () => {
+    expect(toFlowNodes(doc, {}, new Set(), undefined)).toEqual(toFlowNodes(doc, {}, new Set()));
   });
 });

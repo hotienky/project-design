@@ -173,13 +173,13 @@ export function checkIntegrity(doc: DesignDocument): Issue[] {
       err("edge.duplicate", `Duplicate ${e.kind} edge ${source.name} → ${target.name}`, ref);
     edgeKeys.add(key);
 
-    if (e.kind === "calls" && target.kind === "api") {
+    if ((e.kind === "calls" || e.kind === "exposes") && target.kind === "api") {
       const ops = new Set(target.data.operations.map((o) => o.id));
       for (const op of e.data.operations) {
         if (!ops.has(op))
           err(
             "edge.unknown_operation",
-            `${source.name} calls unknown operation "${op}" on ${target.name}`,
+            `${source.name} ${meta.label} unknown operation "${op}" on ${target.name}`,
             ref,
           );
       }

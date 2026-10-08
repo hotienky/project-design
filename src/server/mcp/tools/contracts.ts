@@ -73,7 +73,7 @@ export function registerContractTools(server: McpServer, ctx: McpContext) {
         api,
         implementedBy: t.index
           .incoming(api.id, "exposes")
-          .map((e) => brief(t.index.node(e.source)!)),
+          .map((e) => ({ ...brief(t.index.node(e.source)!), operations: e.data.operations })),
         consumedBy: t.index.incoming(api.id, "calls").map((e) => ({
           ...brief(t.index.node(e.source)!),
           operations: e.data.operations,
