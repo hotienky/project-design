@@ -11,11 +11,13 @@ import { createStore } from "zustand/vanilla";
 
 import { allowedEdgeKinds, NODE_KIND_META } from "@/lib/design/catalog";
 import {
+  applyServiceTemplate,
   removeChannel,
   removeField,
   removeOperation,
   renameField,
   scrubEntityRefs,
+  type TemplateApplication,
 } from "@/lib/design/edits";
 import { reparentNode, subtreeIds, type Point } from "@/lib/design/geometry";
 import { newEdgeId, newNodeId } from "@/lib/design/ids";
@@ -61,6 +63,8 @@ export interface DesignerState {
   removeChannel(queueId: string, channelId: string): void;
   renameField(entityId: string, from: string, to: string): void;
   removeField(entityId: string, name: string): void;
+  /** Applies a service template as one undo step; returns what was added (see edits.ts). */
+  applyServiceTemplate(serviceId: string, templateId: string): TemplateApplication["added"];
   /** Replace the draft wholesale (restore a version, reload after a conflict). */
   replaceDocument(document: DesignDocument, revision?: number): void;
 
@@ -211,6 +215,11 @@ export function createDesignerStore(init: {
           },
           removeField(entityId, name) {
             mutate((doc) => removeField(doc, entityId, name));
+          },
+          applyServiceTemplate(serviceId, templateId) {
+            const result = applyServiceTemplate(get().document, serviceId, templateId);
+            mutate(() => result.document);
+            return result.added;
           },
 
           replaceDocument(document, revision) {

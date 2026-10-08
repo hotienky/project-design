@@ -3,7 +3,9 @@
  * (no dangling operation, channel, field or entity references). Pure and
  * isomorphic; the designer store applies them as single undo steps.
  */
+import { newEdgeId, newItemId, newNodeId } from "@/lib/design/ids";
 import type { DesignDocument, DesignNode, Field, TypeShape } from "@/lib/design/schema";
+import { getServiceTemplate } from "@/lib/design/service-templates";
 
 const mapNode = (doc: DesignDocument, id: string, fn: (n: DesignNode) => DesignNode) => ({
   ...doc,
@@ -136,5 +138,139 @@ export function scrubEntityRefs(doc: DesignDocument, gone: ReadonlySet<string>):
           return n;
       }
     }),
+  };
+}
+
+export interface TemplateApplication {
+  document: DesignDocument;
+  added: { stack: number; conventions: number; layers: number; env: number };
+}
+
+const LAYER_GAP = 16;
+const LAYER_TOP = 56;
+const LAYER_X = 40;
+
+const joinPath = (root: string, rel: string) =>
+  root ? `${root.replace(/\/+$/, "")}/${rel}`.replace(/^\.\//, "") : rel;
+
+/**
+ * Applies a service template (service-templates.ts) to a service node. Existing
+ * content is never overwritten: language/framework/runtime/type are set, but
+ * path, port, env vars, stack items, conventions, patterns and layers are only
+ * added when missing. Layers are skipped when the service already has any.
+ * Returns the document unchanged for an unknown service or template.
+ */
+export function applyServiceTemplate(
+  doc: DesignDocument,
+  serviceId: string,
+  templateId: string,
+): TemplateApplication {
+  const template = getServiceTemplate(templateId);
+  const service = doc.nodes.find((n) => n.id === serviceId);
+  const none = { stack: 0, conventions: 0, layers: 0, env: 0 };
+  if (!template || !service || service.kind !== "service") return { document: doc, added: none };
+
+  const rootPath = service.data.path || template.defaultPath;
+  const hasLayers = doc.nodes.some((n) => n.parentId === serviceId && n.kind === "layer");
+
+  const env = template.env.filter((v) => !service.data.env.some((e) => e.name === v.name));
+  const patterns = template.patterns.filter(
+    (p) => !service.patterns.some((x) => x.name.toLowerCase() === p.name.toLowerCase()),
+  );
+
+  const stack = template.stack
+    .filter(
+      (t) =>
+        !doc.stack.some(
+          (s) =>
+            s.category === t.category &&
+            s.name === t.name &&
+            s.scope.length === 1 &&
+            s.scope[0] === serviceId,
+        ),
+    )
+    .map((t) => ({ id: newItemId("stk"), ...t, scope: [serviceId] }));
+  const conventions = template.conventions
+    .filter(
+      (c) =>
+        !doc.conventions.some(
+          (x) => x.rule === c.rule && x.scope.length === 1 && x.scope[0] === serviceId,
+        ),
+    )
+    .map((c) => ({ id: newItemId("cnv"), ...c, scope: [serviceId] }));
+
+  const layerIds = new Map(template.layers.map((l) => [l.key, newNodeId("layer")]));
+  const layerNodes: DesignNode[] = hasLayers
+    ? []
+    : template.layers.map((l, i) => ({
+        id: layerIds.get(l.key)!,
+        kind: "layer",
+        name: l.name,
+        description: "",
+        parentId: serviceId,
+        position: { x: LAYER_X, y: LAYER_TOP + i * (140 + LAYER_GAP) },
+        size: { width: 440, height: 140 },
+        tags: [],
+        patterns: [],
+        data: {
+          path: joinPath(rootPath, l.path),
+          responsibilities: l.responsibilities,
+          rules: l.rules,
+        },
+      }));
+  const layerEdges = hasLayers
+    ? []
+    : template.layers.flatMap((l) =>
+        l.dependsOn.map((to) => ({
+          id: newEdgeId("depends_on"),
+          kind: "depends_on" as const,
+          source: layerIds.get(l.key)!,
+          target: layerIds.get(to)!,
+          label: "",
+          description: "",
+          data: {},
+        })),
+      );
+  const neededHeight = LAYER_TOP + template.layers.length * (140 + LAYER_GAP) + LAYER_GAP;
+
+  const nodes = doc.nodes.map((n): DesignNode => {
+    if (n.id !== serviceId || n.kind !== "service") return n;
+    return {
+      ...n,
+      patterns: [...n.patterns, ...patterns],
+      size:
+        layerNodes.length > 0
+          ? {
+              width: Math.max(n.size?.width ?? 0, 520),
+              height: Math.max(n.size?.height ?? 0, neededHeight),
+            }
+          : n.size,
+      data: {
+        ...n.data,
+        type: template.type,
+        language: template.language,
+        framework: template.framework,
+        runtime: template.runtime,
+        path: rootPath,
+        port: n.data.port ?? template.port,
+        env: [...n.data.env, ...env],
+      },
+    };
+  });
+
+  return {
+    document: {
+      ...doc,
+      stack: [...doc.stack, ...stack],
+      conventions: [...doc.conventions, ...conventions],
+      nodes: [...nodes, ...layerNodes],
+      edges: [...doc.edges, ...layerEdges],
+    },
+    added: {
+      stack: stack.length,
+      conventions: conventions.length,
+      layers: layerNodes.length,
+      env: env.length,
+    },
   };
 }

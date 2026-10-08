@@ -39,12 +39,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { canContain, NODE_KIND_META } from "@/lib/design/catalog";
+import { SERVICE_TEMPLATES } from "@/lib/design/service-templates";
 import { subtreeIds } from "@/lib/design/geometry";
 import { indexDesign } from "@/lib/design/graph";
 import type { DesignNode, Field as DesignField } from "@/lib/design/schema";
 import { cn } from "@/lib/utils";
 import { useSelection } from "@/stores/selection-store";
 import { useStatusStore } from "@/stores/status-store";
+import { toast } from "sonner";
 import { z } from "zod";
 
 const TOP_LEVEL = "__top__";
@@ -145,6 +147,31 @@ export function NodeForm({ node }: { node: DesignNode }) {
       <Section title="Details" className="border-b-0">
         {node.kind === "service" && (
           <>
+            <Field
+              label="Template"
+              hint="Fills language, framework and runtime, and adds scoped tech stack, conventions and layers. Existing content is kept."
+            >
+              <Select
+                value=""
+                onValueChange={(templateId) => {
+                  const added = store.getState().applyServiceTemplate(node.id, templateId);
+                  toast.success(
+                    `Template applied: ${added.stack} stack items, ${added.conventions} conventions, ${added.layers} layers`,
+                  );
+                }}
+              >
+                <SelectTrigger className="w-full" size="sm" aria-label="Apply template">
+                  <SelectValue placeholder="Apply template…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SERVICE_TEMPLATES.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
             <SelectField
               label="Type"
               value={node.data.type}
