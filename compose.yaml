@@ -1,0 +1,43 @@
+name: project-design
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: design
+      POSTGRES_PASSWORD: design
+      POSTGRES_DB: project_design
+    ports:
+      # 5434 on the host avoids clashing with a local Postgres on 5432.
+      - "127.0.0.1:${DB_PORT:-5434}:5432"
+    volumes:
+      # Postgres 18 images keep data under /var/lib/postgresql/<major>/docker,
+      # so the volume is mounted one level up from the old .../data path.
+      - pgdata:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U design -d project_design"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgres://design:design@db:5432/project_design
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      APP_BASIC_AUTH: ${APP_BASIC_AUTH:-}
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  pgdata:
