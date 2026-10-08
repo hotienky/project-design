@@ -34,10 +34,17 @@ export function ValidationPanel() {
   return (
     <section
       aria-label="Validation"
-      className="flex h-70 w-90 flex-col rounded-lg border bg-background shadow-md"
+      className="flex h-70 w-90 flex-col overflow-hidden rounded-xl border bg-background shadow-lg shadow-black/5"
     >
-      <header className="flex items-center justify-between border-b px-3 py-1.5">
-        <h2 className="text-sm font-medium">Validation</h2>
+      <header className="flex items-start justify-between gap-2 border-b px-4 py-2.5">
+        <div>
+          <h2 className="text-sm font-semibold">Validation</h2>
+          <p className="text-xs text-muted-foreground">
+            {issues.length === 0
+              ? "Checked against the design rules"
+              : `${issues.length} ${issues.length === 1 ? "issue" : "issues"} · click one to find it`}
+          </p>
+        </div>
         <Button
           variant="ghost"
           size="icon-xs"
@@ -49,14 +56,14 @@ export function ValidationPanel() {
       </header>
       <ScrollArea className="min-h-0 flex-1">
         {issues.length === 0 ? (
-          <p className="p-3 text-sm text-muted-foreground">No problems found.</p>
+          <p className="px-4 py-3 text-sm text-muted-foreground">No problems found.</p>
         ) : (
           (["error", "warning", "info"] as const).map((severity) => {
             const group = issues.filter((i) => i.severity === severity);
             if (group.length === 0) return null;
             return (
-              <div key={severity} className="p-1.5">
-                <h3 className="px-1.5 pb-1 text-xs font-medium text-muted-foreground uppercase">
+              <div key={severity} className="px-2 py-1.5">
+                <h3 className="px-2 pb-1 text-xs font-semibold text-muted-foreground">
                   {TITLES[severity]} ({group.length})
                 </h3>
                 <ul>
@@ -67,7 +74,7 @@ export function ValidationPanel() {
                         <button
                           type="button"
                           disabled={!clickable}
-                          className="flex w-full items-start gap-2 rounded px-1.5 py-1 text-left text-xs enabled:hover:bg-muted"
+                          className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-xs enabled:hover:bg-muted"
                           onClick={() => open(issue)}
                         >
                           {ICON[severity]}

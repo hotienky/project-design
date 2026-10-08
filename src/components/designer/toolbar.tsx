@@ -27,6 +27,7 @@ function Tool({
         <Button
           variant={pressed ? "secondary" : "ghost"}
           size="icon-sm"
+          className="rounded-none"
           aria-label={label}
           aria-pressed={pressed}
           disabled={disabled}
@@ -52,7 +53,7 @@ export function Toolbar() {
     <div
       role="toolbar"
       aria-label="Canvas tools"
-      className="flex items-center gap-0.5 rounded-lg border bg-background p-1 shadow-sm"
+      className="flex items-center divide-x overflow-hidden rounded-lg border bg-background shadow-xs"
     >
       <Tool label="Undo (Ctrl+Z)" disabled={!canUndo} onClick={() => undo()}>
         <Undo2 />

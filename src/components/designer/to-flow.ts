@@ -1,5 +1,5 @@
 /** Maps the design document to React Flow nodes and edges. Pure. */
-import { MarkerType, type Edge, type Node } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 
 import { EDGE_KIND_META, NODE_KIND_META } from "@/lib/design/catalog";
 import { nodeSize } from "@/lib/design/geometry";
@@ -72,7 +72,6 @@ export function toFlowEdges(doc: DesignDocument, selected: ReadonlySet<string>):
     data: { edge: e, caption: edgeCaption(e, nodes) },
     animated: e.kind === "publishes" || e.kind === "subscribes",
     selected: selected.has(e.id),
-    markerEnd: { type: MarkerType.ArrowClosed },
     zIndex: 2,
   }));
 }

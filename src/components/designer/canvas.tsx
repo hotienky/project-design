@@ -513,7 +513,7 @@ function Flow({ wide }: { wide: boolean }) {
             colorMode={resolvedTheme === "dark" ? "dark" : "light"}
             proOptions={{ hideAttribution: true }}
           >
-            <Background variant={BackgroundVariant.Dots} gap={16} />
+            <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
             {minimapOpen && (
               <MiniMap
                 pannable

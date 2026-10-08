@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal } from "lucide-react";
+import { Boxes, GitCommitHorizontal, MoreHorizontal, Network, Tag } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -49,6 +49,8 @@ export interface ProjectCardData {
   updatedAt: string;
 }
 
+const chip = "inline-flex h-6 items-center gap-1 rounded-md border bg-background px-2";
+
 export function ProjectCard({ project }: { project: ProjectCardData }) {
   const [dialog, setDialog] = useState<"rename" | "delete" | null>(null);
   const [name, setName] = useState(project.name);
@@ -68,15 +70,23 @@ export function ProjectCard({ project }: { project: ProjectCardData }) {
     });
 
   return (
-    <Card className="relative">
-      <CardContent className="flex h-full flex-col gap-2">
-        <div className="flex items-start justify-between gap-2">
-          <Link
-            href={`/projects/${project.slug}`}
-            className="font-heading font-medium after:absolute after:inset-0 hover:underline"
-          >
-            {project.name}
-          </Link>
+    <Card className="relative h-full rounded-xl transition-shadow hover:shadow-md">
+      <CardContent className="flex h-full flex-col gap-3">
+        <div className="flex items-start gap-3">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg border bg-background shadow-xs">
+            <Network className="size-4 text-muted-foreground" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <Link
+              href={`/projects/${project.slug}`}
+              className="block truncate font-heading text-sm font-semibold after:absolute after:inset-0 hover:underline"
+            >
+              {project.name}
+            </Link>
+            <p className="text-xs text-muted-foreground">
+              updated <RelativeTime value={project.updatedAt} />
+            </p>
+          </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -125,12 +135,24 @@ export function ProjectCard({ project }: { project: ProjectCardData }) {
         <p className="line-clamp-2 min-h-10 text-sm text-muted-foreground">
           {project.description || "No description"}
         </p>
-        <p className="mt-auto text-xs text-muted-foreground">
-          rev {project.revision}
-          {project.latestVersion !== null && ` · v${project.latestVersion}`} · {project.nodeCount}{" "}
-          {project.nodeCount === 1 ? "component" : "components"} · updated{" "}
-          <RelativeTime value={project.updatedAt} />
-        </p>
+        <div className="mt-auto flex flex-wrap items-center gap-1.5 text-xs font-medium tabular-nums">
+          <span className={chip} title="Draft revision">
+            <GitCommitHorizontal className="size-3 text-muted-foreground" aria-hidden />
+            rev {project.revision}
+          </span>
+          <span className={chip}>
+            <Boxes className="size-3 text-muted-foreground" aria-hidden />
+            {project.nodeCount} {project.nodeCount === 1 ? "component" : "components"}
+          </span>
+          {project.latestVersion !== null && (
+            <span
+              className={`${chip} border-violet-500/50 text-violet-600 dark:text-violet-300`}
+              title="Latest published version"
+            >
+              <Tag className="size-3" aria-hidden />v{project.latestVersion}
+            </span>
+          )}
+        </div>
       </CardContent>
 
       <Dialog open={dialog === "rename"} onOpenChange={(o) => !o && setDialog(null)}>

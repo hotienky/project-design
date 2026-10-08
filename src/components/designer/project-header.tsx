@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CircleAlert, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CircleAlert, Network, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -49,7 +49,7 @@ function ProjectName() {
         maxLength={120}
         aria-label="Project name"
         autoFocus
-        className="h-7 w-64"
+        className="h-6 w-64"
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
@@ -62,7 +62,7 @@ function ProjectName() {
   return (
     <button
       type="button"
-      className="rounded px-1 font-heading text-sm font-semibold hover:bg-muted"
+      className="-mx-1 truncate rounded px-1 text-left font-heading text-sm font-semibold hover:bg-muted"
       title="Click to rename"
       onClick={() => {
         setDraft(name);
@@ -86,7 +86,7 @@ function ValidateButton() {
   const count = errors || warnings;
   return (
     <Button
-      variant={open ? "secondary" : "outline"}
+      variant={open ? "secondary" : "ghost"}
       size="sm"
       aria-pressed={open}
       onClick={() => {
@@ -117,35 +117,49 @@ function ValidateButton() {
 }
 
 export function ProjectHeader() {
-  const { slug } = useProjectMeta();
+  const { slug, description } = useProjectMeta();
   const pathname = usePathname();
   return (
     <div className="shrink-0 border-b bg-background">
-      <div className="flex h-12 items-center gap-3 px-4">
-        <ProjectName />
-        <SaveIndicator />
+      <div className="flex h-14 items-center gap-3 px-4">
+        <span className="grid size-9 shrink-0 place-items-center rounded-lg border bg-background shadow-xs">
+          <Network className="size-4 text-muted-foreground" aria-hidden />
+        </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <ProjectName />
+            <SaveIndicator />
+          </div>
+          <p className="max-w-xl truncate text-xs text-muted-foreground">
+            {description || "Architecture design for coding agents"}
+          </p>
+        </div>
         <div className="ml-auto flex items-center gap-2">
-          <ValidateButton />
+          <div className="flex items-center divide-x overflow-hidden rounded-lg border bg-background shadow-xs [&>button]:rounded-none [&>button]:border-0 [&>button]:shadow-none">
+            <ValidateButton />
+            <ExportMenu />
+            <ConnectDialog />
+          </div>
           <PublishDialog />
-          <ExportMenu />
-          <ConnectDialog />
         </div>
       </div>
-      <nav aria-label="Project sections" className="flex h-10 items-end gap-1 px-4">
-        {TABS.map((tab) => {
-          const href = tab.segment ? `/projects/${slug}/${tab.segment}` : `/projects/${slug}`;
-          const active = pathname === href;
-          return (
-            <Link
-              key={tab.label}
-              href={href}
-              aria-current={active ? "page" : undefined}
-              className={`border-b-2 px-3 pb-2 text-sm ${active ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-            >
-              {tab.label}
-            </Link>
-          );
-        })}
+      <nav aria-label="Project sections" className="flex h-11 items-center px-4">
+        <div className="inline-flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
+          {TABS.map((tab) => {
+            const href = tab.segment ? `/projects/${slug}/${tab.segment}` : `/projects/${slug}`;
+            const active = pathname === href;
+            return (
+              <Link
+                key={tab.label}
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={`rounded-md px-3 py-1 text-sm transition-colors ${active ? "bg-background font-medium text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {tab.label}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
     </div>
   );

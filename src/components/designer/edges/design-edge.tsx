@@ -13,16 +13,17 @@ import {
 import type { FlowEdge } from "@/components/designer/to-flow";
 import type { EdgeKind } from "@/lib/design/schema";
 
+/** Each kind has its own colour; dashes tell structural, data and async links apart. */
 const STYLE: Record<EdgeKind, { stroke: string; width: number; dash?: string }> = {
-  depends_on: { stroke: "var(--muted-foreground)", width: 1.5, dash: "6 4" },
-  calls: { stroke: "var(--foreground)", width: 1.5 },
-  exposes: { stroke: "var(--foreground)", width: 3 },
-  accesses: { stroke: "var(--muted-foreground)", width: 1.5, dash: "2 4" },
+  depends_on: { stroke: "#94a3b8", width: 1.5, dash: "6 4" },
+  calls: { stroke: "#0ea5e9", width: 1.5 },
+  exposes: { stroke: "#8b5cf6", width: 2.5 },
+  accesses: { stroke: "#10b981", width: 1.5, dash: "2 4" },
   publishes: { stroke: "#f97316", width: 1.5, dash: "5" },
   subscribes: { stroke: "#f97316", width: 1.5, dash: "5" },
   uses: { stroke: "#ec4899", width: 1.5 },
   relation: { stroke: "#f59e0b", width: 1.5 },
-  interacts: { stroke: "#14b8a6", width: 1 },
+  interacts: { stroke: "#14b8a6", width: 1.25 },
 };
 
 interface Box {
@@ -62,14 +63,7 @@ function borderPoint(from: Box, to: Box): { x: number; y: number; position: Posi
 }
 
 /** A "floating" smooth-step edge: it attaches to the nearest border, not to a fixed handle. */
-export function DesignEdgeView({
-  id,
-  source,
-  target,
-  data,
-  selected,
-  markerEnd,
-}: EdgeProps<FlowEdge>) {
+export function DesignEdgeView({ id, source, target, data, selected }: EdgeProps<FlowEdge>) {
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
   if (!sourceNode || !targetNode || !data) return null;
@@ -88,23 +82,50 @@ export function DesignEdgeView({
     borderRadius: 8,
   });
   const style = STYLE[data.edge.kind];
+  const stroke = selected ? "var(--primary)" : style.stroke;
+  const marker = `pd-arrow-${id}`;
   return (
     <>
+      <defs>
+        <marker
+          id={marker}
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="7"
+          markerHeight="7"
+          orient="auto-start-reverse"
+        >
+          <path d="M0 1 L9 5 L0 9 z" fill={stroke} />
+        </marker>
+      </defs>
       <BaseEdge
         id={id}
         path={path}
-        markerEnd={markerEnd}
+        markerEnd={`url(#${marker})`}
         interactionWidth={16}
         style={{
-          stroke: selected ? "var(--primary)" : style.stroke,
+          stroke,
           strokeWidth: style.width + (selected ? 1 : 0),
           ...(style.dash ? { strokeDasharray: style.dash } : {}),
         }}
       />
+      <circle
+        cx={from.x}
+        cy={from.y}
+        r={3.5}
+        fill={stroke}
+        stroke="var(--background)"
+        strokeWidth={1.5}
+      />
       <EdgeLabelRenderer>
         <div
-          className="nodrag nopan pointer-events-auto absolute rounded-full border bg-background px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground shadow-sm"
-          style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+          className="nodrag nopan pointer-events-auto absolute rounded-full border bg-background px-2 py-0.5 text-[10px] leading-none font-medium shadow-xs"
+          style={{
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            borderColor: stroke,
+            color: `color-mix(in oklch, ${stroke} 70%, var(--foreground))`,
+          }}
         >
           {data.caption}
         </div>

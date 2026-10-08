@@ -1,6 +1,18 @@
 "use client";
 
 import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react";
+import {
+  GripVertical,
+  KeyRound,
+  ListChecks,
+  PackageOpen,
+  Ruler,
+  Shapes,
+  StickyNote,
+  Tag,
+  Target,
+  type LucideIcon,
+} from "lucide-react";
 
 import { KIND_STYLE, NOTE_COLORS, STATUS_STYLE } from "@/components/designer/nodes/kind-style";
 import { useDesignerStore } from "@/components/designer/store-provider";
@@ -21,17 +33,20 @@ const SIDES = [
  * All handles are "source" handles: with ConnectionMode.Loose any handle can start or end a
  * connection, and the direction is always drag-start → drop target.
  */
-function Handles() {
+function Handles({ kind }: { kind: DesignNode["kind"] }) {
   return SIDES.map(([id, position]) => (
     <Handle
       key={id}
       id={id}
       type="source"
       position={position}
-      className="size-2.5! border-background! bg-primary! opacity-0 transition-opacity group-hover/node:opacity-100 group-data-[selected=true]/node:opacity-100"
+      style={{ background: KIND_STYLE[kind].hex }}
+      className="size-2.5! border-2! border-background! opacity-0 transition-opacity group-hover/node:opacity-100 group-data-[selected=true]/node:opacity-100"
     />
   ));
 }
+
+const selectedRing = "ring-2 ring-primary/60 ring-offset-2 ring-offset-canvas";
 
 function subtitleOf(n: DesignNode): string {
   switch (n.kind) {
@@ -65,8 +80,52 @@ function subtitleOf(n: DesignNode): string {
   }
 }
 
-function StatusDot({ status }: { status: NonNullable<FlowNode["data"]["status"]> }) {
+interface Metric {
+  icon: LucideIcon;
+  value: number;
+  label: string;
+}
+
+/** Counts worth seeing at a glance, per kind. Zero counts, and counts the subtitle already shows, are left out. */
+function metricsOf(n: DesignNode): Metric[] {
+  const own: Metric[] = [];
+  switch (n.kind) {
+    case "service":
+      own.push(
+        { icon: ListChecks, value: n.data.responsibilities.length, label: "responsibilities" },
+        { icon: KeyRound, value: n.data.env.length, label: "environment variables" },
+      );
+      break;
+    case "layer":
+      own.push(
+        { icon: ListChecks, value: n.data.responsibilities.length, label: "responsibilities" },
+        { icon: Ruler, value: n.data.rules.length, label: "rules" },
+      );
+      break;
+    case "module":
+      if (n.data.responsibilities.length > 0)
+        own.push({ icon: PackageOpen, value: n.data.exports.length, label: "exports" });
+      break;
+    case "integration":
+      own.push({ icon: KeyRound, value: n.data.env.length, label: "environment variables" });
+      break;
+    case "actor":
+      own.push({ icon: Target, value: n.data.goals.length, label: "goals" });
+      break;
+  }
+  own.push(
+    { icon: Shapes, value: n.patterns.length, label: "patterns" },
+    { icon: Tag, value: n.tags.length, label: "tags" },
+  );
+  return own.filter((m) => m.value > 0);
+}
+
+const chip =
+  "inline-flex h-[18px] shrink-0 items-center gap-1 rounded-md border bg-background px-1.5 text-[11px] leading-none font-medium tabular-nums";
+
+function StatusChip({ status }: { status: NonNullable<FlowNode["data"]["status"]> }) {
   const style = STATUS_STYLE[status.status];
+  const Icon = style.icon;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -74,8 +133,11 @@ function StatusDot({ status }: { status: NonNullable<FlowNode["data"]["status"]>
           role="img"
           aria-label={`Status: ${style.label}`}
           data-status={status.status}
-          className={cn("inline-block size-2.5 shrink-0 rounded-full", style.dot)}
-        />
+          className={cn(chip, style.chip)}
+        >
+          <Icon className="size-3" aria-hidden />
+          {style.label}
+        </span>
       </TooltipTrigger>
       <TooltipContent>
         {style.label}
@@ -85,78 +147,106 @@ function StatusDot({ status }: { status: NonNullable<FlowNode["data"]["status"]>
   );
 }
 
-function Chips({ node }: { node: DesignNode }) {
-  const chips = [...node.patterns.map((p) => p.name), ...node.tags.map((t) => `#${t}`)];
-  if (chips.length === 0) return null;
-  const shown = node.patterns.slice(0, 2).map((p) => p.name);
-  const more = node.patterns.length - shown.length;
+/** The footer row: metric chips (icon + count) and the agent-reported status. */
+function Chips({ data, className }: { data: FlowNode["data"]; className?: string }) {
+  const { node, status } = data;
+  const metrics = metricsOf(node);
+  if (metrics.length === 0 && !status) return null;
   return (
-    <div className="mt-1 flex flex-wrap gap-1">
-      {shown.map((name) => (
-        <span key={name} className="rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none">
-          {name}
-        </span>
-      ))}
-      {more > 0 && (
-        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none">+{more}</span>
-      )}
-      {node.tags.slice(0, 3).map((t) => (
+    <div className={cn("flex flex-wrap items-center gap-1", className)}>
+      {metrics.map(({ icon: Icon, value, label }) => (
         <span
-          key={t}
-          className="rounded border px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground"
+          key={label}
+          className={cn(chip, "text-foreground/80")}
+          title={
+            label === "patterns"
+              ? node.patterns.map((p) => p.name).join(", ")
+              : label === "tags"
+                ? node.tags.join(", ")
+                : `${value} ${label}`
+          }
         >
-          {t}
+          <Icon className="size-3 text-muted-foreground" aria-hidden />
+          {value}
         </span>
       ))}
+      {status && <StatusChip status={status} />}
     </div>
   );
 }
 
-function Title({ data }: { data: FlowNode["data"] }) {
-  const { node, status } = data;
-  const style = KIND_STYLE[node.kind];
+function IconTile({ kind, small }: { kind: DesignNode["kind"]; small?: boolean }) {
+  const style = KIND_STYLE[kind];
   const Icon = style.icon;
-  const subtitle = subtitleOf(node);
   return (
-    <div className="min-w-0">
-      <div className="flex items-center gap-1.5">
-        <Icon className={cn("size-3.5 shrink-0", style.text)} aria-hidden />
-        <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-          {NODE_KIND_META[node.kind].label}
-        </span>
-        {status && (
-          <span className="ml-auto">
-            <StatusDot status={status} />
-          </span>
-        )}
-      </div>
-      <div className="truncate text-sm font-medium" title={node.name}>
-        {node.name}
-      </div>
-      {subtitle && (
-        <div className="truncate text-xs text-muted-foreground" title={subtitle}>
+    <span
+      title={NODE_KIND_META[kind].label}
+      className={cn(
+        "grid shrink-0 place-items-center border bg-background shadow-xs",
+        small ? "size-5 rounded-md" : "size-7 rounded-lg",
+      )}
+    >
+      <Icon className={cn(small ? "size-3" : "size-3.5", style.text)} aria-hidden />
+    </span>
+  );
+}
+
+/** Icon tile, name and a muted subtitle (the kind's label when there's nothing more specific). */
+function Title({ node }: { node: DesignNode }) {
+  const subtitle = subtitleOf(node) || NODE_KIND_META[node.kind].label;
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+      <IconTile kind={node.kind} />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13px] leading-4 font-semibold" title={node.name}>
+          {node.name}
+        </div>
+        <div className="truncate text-xs leading-4 text-muted-foreground" title={subtitle}>
           {subtitle}
         </div>
-      )}
+      </div>
     </div>
+  );
+}
+
+/** Containers keep a one-line header: their children start close to the top edge. */
+function ContainerTitle({ node }: { node: DesignNode }) {
+  const subtitle = subtitleOf(node) || NODE_KIND_META[node.kind].label;
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-1.5 text-xs">
+      <IconTile kind={node.kind} small />
+      <span className="shrink-0 font-semibold" title={node.name}>
+        {node.name}
+      </span>
+      <span className="truncate text-muted-foreground" title={subtitle}>
+        {subtitle}
+      </span>
+    </div>
+  );
+}
+
+const card =
+  "group/node w-52 rounded-xl border bg-card p-2.5 shadow-[0_1px_3px_0_rgb(0_0_0/0.04)] transition-shadow hover:shadow-md";
+
+function Grip() {
+  return (
+    <GripVertical
+      className="-mr-1 size-3.5 shrink-0 self-start text-muted-foreground/50 group-hover/node:text-muted-foreground"
+      aria-hidden
+    />
   );
 }
 
 /** Leaf node: module, api, integration, queue, actor. */
 export function CardNode({ data, selected }: NodeProps<FlowNode>) {
-  const style = KIND_STYLE[data.node.kind];
   return (
-    <div
-      data-selected={selected}
-      className={cn(
-        "group/node w-52 rounded-md border border-l-[3px] bg-card px-2.5 py-2 shadow-sm",
-        style.border,
-        selected && "ring-2 ring-primary",
-      )}
-    >
-      <Handles />
-      <Title data={data} />
-      <Chips node={data.node} />
+    <div data-selected={selected} className={cn(card, selected && selectedRing)}>
+      <Handles kind={data.node.kind} />
+      <div className="flex items-start gap-1">
+        <Title node={data.node} />
+        <Grip />
+      </div>
+      <Chips data={data} className="mt-2" />
     </div>
   );
 }
@@ -164,21 +254,16 @@ export function CardNode({ data, selected }: NodeProps<FlowNode>) {
 export function EntityNode({ data, selected }: NodeProps<FlowNode>) {
   const { node } = data;
   if (node.kind !== "entity") return null;
-  const style = KIND_STYLE.entity;
   const fields = node.data.fields.slice(0, 6);
   return (
-    <div
-      data-selected={selected}
-      className={cn(
-        "group/node w-52 rounded-md border border-l-[3px] bg-card px-2.5 py-2 shadow-sm",
-        style.border,
-        selected && "ring-2 ring-primary",
-      )}
-    >
-      <Handles />
-      <Title data={data} />
+    <div data-selected={selected} className={cn(card, selected && selectedRing)}>
+      <Handles kind={node.kind} />
+      <div className="flex items-start gap-1">
+        <Title node={node} />
+        <Grip />
+      </div>
       {fields.length > 0 && (
-        <ul className="mt-1.5 space-y-0.5 border-t pt-1.5 font-mono text-[11px]">
+        <ul className="mt-2 space-y-0.5 rounded-lg border bg-muted/40 px-2 py-1.5 font-mono text-[11px]">
           {fields.map((f) => (
             <li key={f.name} className="flex gap-1 truncate">
               <span className="w-5 shrink-0 text-amber-600">
@@ -200,7 +285,7 @@ export function EntityNode({ data, selected }: NodeProps<FlowNode>) {
           )}
         </ul>
       )}
-      <Chips node={node} />
+      <Chips data={data} className="mt-2" />
     </div>
   );
 }
@@ -212,14 +297,17 @@ export function NoteNode({ data, selected }: NodeProps<FlowNode>) {
     <div
       data-selected={selected}
       className={cn(
-        "group/node h-28 w-52 overflow-hidden rounded-sm p-2.5 text-xs shadow-sm",
+        "group/node h-28 w-52 overflow-hidden rounded-xl border border-black/5 p-3 text-xs shadow-[0_1px_3px_0_rgb(0_0_0/0.06)]",
         NOTE_COLORS[node.data.color],
-        selected && "ring-2 ring-primary",
+        selected && selectedRing,
       )}
     >
-      <Handles />
-      <div className="mb-1 font-medium">{node.name}</div>
-      <p className="line-clamp-4 whitespace-pre-wrap">{node.description}</p>
+      <Handles kind={node.kind} />
+      <div className="mb-1 flex items-center gap-1.5 font-semibold">
+        <StickyNote className="size-3.5 shrink-0 opacity-60" aria-hidden />
+        <span className="truncate">{node.name}</span>
+      </div>
+      <p className="line-clamp-4 whitespace-pre-wrap opacity-90">{node.description}</p>
     </div>
   );
 }
@@ -232,10 +320,10 @@ export function ContainerNode({ id, data, selected }: NodeProps<FlowNode>) {
     <div
       data-selected={selected}
       className={cn(
-        "group/node h-full w-full rounded-lg border border-l-[3px] border-dashed",
-        style.border,
+        "group/node h-full w-full rounded-xl border",
+        style.line,
         style.tint,
-        selected && "ring-2 ring-primary",
+        selected && selectedRing,
       )}
     >
       <NodeResizer
@@ -250,10 +338,10 @@ export function ContainerNode({ id, data, selected }: NodeProps<FlowNode>) {
             ])
         }
       />
-      <Handles />
-      <div className="px-2.5 py-1.5">
-        <Title data={data} />
-        <Chips node={data.node} />
+      <Handles kind={data.node.kind} />
+      <div className="flex items-center gap-2 px-2 py-1">
+        <ContainerTitle node={data.node} />
+        <Chips data={data} className="justify-end" />
       </div>
     </div>
   );

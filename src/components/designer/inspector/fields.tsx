@@ -35,8 +35,8 @@ export function Section({
   className?: string;
 }) {
   return (
-    <section className={cn("grid gap-3 border-b px-4 py-3", className)}>
-      <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{title}</h3>
+    <section className={cn("grid gap-3 border-b px-4 py-4", className)}>
+      <h3 className="text-sm font-semibold">{title}</h3>
       {children}
     </section>
   );
