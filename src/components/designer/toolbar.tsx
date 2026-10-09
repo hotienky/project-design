@@ -5,6 +5,7 @@ import {
   LayoutGrid,
   Map as MapIcon,
   Maximize,
+  Network,
   Redo2,
   ShieldCheck,
   Undo2,
@@ -59,6 +60,12 @@ export function Toolbar() {
   const validationOpen = useCanvasUi((s) => s.validationOpen);
   const minimapOpen = useCanvasUi((s) => s.minimapOpen);
   const viewMode = useCanvasUi((s) => s.viewMode);
+  const focusId = useCanvasUi((s) => s.focusId);
+  // A module's level is drawn from its endpoints, with nothing to arrange.
+  const moduleLevel = useDesigner(
+    (s) =>
+      viewMode === "levels" && s.document.nodes.find((n) => n.id === focusId)?.kind === "module",
+  );
   return (
     <div
       role="toolbar"
@@ -87,6 +94,13 @@ export function Toolbar() {
       </Tool>
       <Tool label="Fit view" onClick={() => actions.fitView()}>
         <Maximize />
+      </Tool>
+      <Tool
+        label="Tidy layout: arrange as a tree"
+        disabled={readOnly || moduleLevel}
+        onClick={() => actions.tidyLayout()}
+      >
+        <Network />
       </Tool>
       <Tool
         label="Validation panel"

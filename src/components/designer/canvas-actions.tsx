@@ -15,6 +15,8 @@ export interface CanvasActions {
   /** Delete the selection, asking first when containers with children are included. */
   deleteSelection(): void;
   fitView(): void;
+  /** Arrange what the current view shows as a tree, then frame it. */
+  tidyLayout(): void;
 }
 
 const noop: CanvasActions = {
@@ -23,6 +25,7 @@ const noop: CanvasActions = {
   focus() {},
   deleteSelection() {},
   fitView() {},
+  tidyLayout() {},
 };
 
 const Ctx = createContext<RefObject<CanvasActions> | null>(null);
@@ -52,6 +55,7 @@ export function useCanvasActions(): CanvasActions {
       focus: (t) => ref.current.focus(t),
       deleteSelection: () => ref.current.deleteSelection(),
       fitView: () => ref.current.fitView(),
+      tidyLayout: () => ref.current.tidyLayout(),
     }),
     [ref],
   );

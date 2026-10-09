@@ -210,8 +210,11 @@ export function reparentNode(
   };
 }
 
-const PAD = 24;
-const HEADER = 48;
+/** Inset of a container's children: side/bottom padding, and the header band at the top. */
+export const CONTAINER_PAD = 24;
+export const CONTAINER_HEADER = 48;
+const PAD = CONTAINER_PAD;
+const HEADER = CONTAINER_HEADER;
 const GAP = 40;
 
 /**

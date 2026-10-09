@@ -22,6 +22,7 @@ import {
 import { reparentNode, type Point } from "@/lib/design/geometry";
 import { newEdgeId, newNodeId } from "@/lib/design/ids";
 import { safeParseDesign, sortNodesParentFirst } from "@/lib/design/integrity";
+import { arrangeLayout } from "@/lib/design/layout";
 import {
   EdgeSchema,
   NodeSchema,
@@ -55,6 +56,8 @@ export interface DesignerState {
     changes: { id: string; position?: Point; size?: { width: number; height: number } }[],
   ): void;
   setParent(id: string, parentId: string | null): void;
+  /** Auto-arranges the top level (null) or a container's inside as a tree (one undo step). */
+  arrangeLayout(rootId: string | null, options?: { collapsed?: boolean }): void;
   /** Returns the new edge id, or null if the connection is not allowed or exists. */
   connect(source: string, target: string, kind?: EdgeKind): string | null;
   updateEdge(id: string, update: (edge: DesignEdge) => DesignEdge): void;
@@ -153,6 +156,10 @@ export function createDesignerStore(init: {
 
           setParent(id, parentId) {
             mutate((doc) => reparentNode(doc, id, parentId));
+          },
+
+          arrangeLayout(rootId, options) {
+            mutate((doc) => arrangeLayout(doc, rootId, options));
           },
 
           connect(source, target, kind) {

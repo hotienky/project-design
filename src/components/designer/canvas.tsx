@@ -572,6 +572,13 @@ function Flow({ wide }: { wide: boolean }) {
       });
     },
     fitView: () => void rf.fitView({ duration: 200, padding: 0.15 }),
+    tidyLayout: () => {
+      const v = viewFor(store.getState().document, useCanvasUi.getState());
+      if (v?.focus?.kind === "module") return;
+      store.getState().arrangeLayout(v?.focus?.id ?? null, { collapsed: !!v && !v.focus });
+      // Wait a frame so React Flow has the new positions before framing them.
+      window.setTimeout(() => void rf.fitView({ duration: 300, padding: 0.15 }), 50);
+    },
   };
   const actions = useRef(current);
   useEffect(() => {
