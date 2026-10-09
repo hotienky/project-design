@@ -19,7 +19,8 @@ function Actions() {
 }
 
 async function ProjectGrid() {
-  const projects = await listProjects(getDb(), await requirePagePrincipal());
+  const principal = await requirePagePrincipal();
+  const projects = await listProjects(getDb(), principal);
   if (projects.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-20 text-center">

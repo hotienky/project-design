@@ -12,13 +12,11 @@ import type { Principal } from "@/server/services/tokens";
 
 /** The signed-in user for this request (the local user in local mode), or null. Read once per request. */
 export const getCurrentUser = cache(async (): Promise<UserRow | null> => {
-  if (isLocalMode()) {
-    await connection();
-    return getLocalUser(getDb());
-  }
-  const token = (await cookies()).get(SESSION_COOKIE)?.value ?? "";
-  // The lookup compares expiry with the clock, so it must run at request time, not in a prerender.
+  // Reads runtime env (local mode) and compares session expiry with the clock, so it must run
+  // at request time, not in a build-time prerender.
   await connection();
+  if (isLocalMode()) return getLocalUser(getDb());
+  const token = (await cookies()).get(SESSION_COOKIE)?.value ?? "";
   return getSessionUser(getDb(), token);
 });
 
