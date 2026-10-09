@@ -163,6 +163,30 @@ docker compose exec -T db psql -U design project_design < backup.sql           #
 A single design can also be exported from the UI (**Export → Design JSON**) and imported again
 from the projects page.
 
+## Deploy (GitHub Actions → Coolify)
+
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs on every push to `main`
+(or manually from the Actions tab): it builds the `Dockerfile`, pushes
+`<REGISTRY>/<IMAGE_NAME>:latest` and `:sha-<short sha>` to your private registry, then sends a
+`POST` to the Coolify deploy webhook so Coolify pulls the new image.
+
+Set these under **Settings → Secrets and variables → Actions**:
+
+| Name                | Kind     | Value                                                                       |
+| ------------------- | -------- | --------------------------------------------------------------------------- |
+| `REGISTRY`          | variable | Registry host, e.g. `registry.example.com`                                  |
+| `IMAGE_NAME`        | variable | Image path in the registry, e.g. `team/project-design`                      |
+| `REGISTRY_USERNAME` | secret   | Registry user allowed to push                                               |
+| `REGISTRY_PASSWORD` | secret   | Its password or access token                                                |
+| `COOLIFY_WEBHOOK`   | secret   | The resource's **Deploy Webhook** URL (`…/api/v1/deploy?uuid=…&force=false`) |
+| `COOLIFY_TOKEN`     | secret   | A Coolify API token with the `deploy` permission                            |
+
+In Coolify, create the app as a **Docker Image** resource pointing at
+`<REGISTRY>/<IMAGE_NAME>:latest`, add the registry credentials to the server
+(`docker login` on the host), expose port 3000 with `/api/health` as the health check, and set
+the variables from [Configuration](#configuration) — at least `DATABASE_URL` and an `https://`
+`APP_URL`. The app migrates its database on start.
+
 ## Configuration
 
 | Variable          | Default                                                           | Purpose                                                              |
