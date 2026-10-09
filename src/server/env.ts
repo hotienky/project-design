@@ -8,6 +8,19 @@ const EnvSchema = z.object({
     .string()
     .regex(/^$|^[^:]+:.+$/, 'APP_BASIC_AUTH must be "user:password"')
     .default(""),
+  // GitHub OAuth app (callback URL: <APP_URL>/api/auth/github/callback). Sign-in needs both.
+  GITHUB_CLIENT_ID: z.string().default(""),
+  GITHUB_CLIENT_SECRET: z.string().default(""),
+  // Comma-separated GitHub logins allowed to sign in; empty lets any GitHub account in.
+  GITHUB_ALLOWED_USERS: z
+    .string()
+    .default("")
+    .transform((v) =>
+      v
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean),
+    ),
   MIGRATE_ON_START: z
     .enum(["true", "false"])
     .default("true")

@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 
+import { requirePrincipal } from "@/server/auth/current";
 import { getDb } from "@/server/db/client";
 import { errorResponse, parseVersionRef } from "@/server/http";
 import { exportProject } from "@/server/services/projects";
@@ -10,7 +11,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/projects/[sl
     const { slug } = await ctx.params;
     const raw = new URL(request.url).searchParams.get("version");
     const ref = parseVersionRef(raw);
-    const envelope = await exportProject(getDb(), slug, ref);
+    const envelope = await exportProject(getDb(), slug, ref, await requirePrincipal());
     return new Response(JSON.stringify(envelope, null, 2) + "\n", {
       headers: {
         "Content-Type": "application/json; charset=utf-8",

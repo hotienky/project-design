@@ -32,6 +32,30 @@ const designDocument = customType<{ data: DesignDocument; driverData: unknown }>
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 const updatedAt = () => timestamp("updated_at", { withTimezone: true }).notNull().defaultNow();
 
+/** A person who signed in with GitHub. */
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  githubId: text("github_id").notNull().unique(),
+  login: text("login").notNull(),
+  name: text("name").notNull().default(""),
+  avatarUrl: text("avatar_url").notNull().default(""),
+  createdAt: createdAt(),
+});
+
+/** Browser sessions. The id is the SHA-256 of the cookie value, like MCP tokens. */
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("sessions_user_idx").on(t.userId)],
+);
+
 /** One row per design. `document` is the editable draft; `revision` guards concurrent saves. */
 export const projects = pgTable(
   "projects",
@@ -40,12 +64,17 @@ export const projects = pgTable(
     slug: text("slug").notNull().unique(),
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
+    // null only for designs created before sign-in existed; the first user claims them.
+    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "cascade" }),
     document: designDocument("document").notNull(),
     revision: integer("revision").notNull().default(1),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [check("projects_slug_format", sql`${t.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`)],
+  (t) => [
+    index("projects_owner_idx").on(t.ownerId),
+    check("projects_slug_format", sql`${t.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
+  ],
 );
 
 /** Immutable published snapshots of a project's draft. */
@@ -74,13 +103,18 @@ export const apiTokens = pgTable(
     name: text("name").notNull(),
     tokenHash: text("token_hash").notNull().unique(),
     tokenPrefix: text("token_prefix").notNull(),
+    // The user the token acts as; null only for tokens created before sign-in existed.
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
     // null = every project; otherwise the token only sees this project.
     projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
     createdAt: createdAt(),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
   },
-  (t) => [index("api_tokens_project_idx").on(t.projectId)],
+  (t) => [
+    index("api_tokens_project_idx").on(t.projectId),
+    index("api_tokens_user_idx").on(t.userId),
+  ],
 );
 
 export const COMPONENT_STATUSES = ["todo", "in_progress", "done", "blocked"] as const;

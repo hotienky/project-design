@@ -29,7 +29,7 @@
 | Design storage | **One JSONB document per project** (the draft) with an integer `revision` for optimistic concurrency, plus immutable **published versions** | One contract serves the canvas, the API, import/export and MCP; whole-document saves stay simple; versions let agents pin a design and diff it |
 | MCP | `@modelcontextprotocol/server` **2.3** `createMcpHandler`, mounted at **`/api/mcp`** (Streamable HTTP, stateless) inside the Next app. It serves the 2026-07-28 protocol and 2025-era clients | No second process; verified with the v2 SDK client and a raw 2025-06-18 `initialize` |
 | MCP auth | Bearer tokens `pd_<43 chars>`, stored as SHA-256 only, optionally **scoped to one project** | Agents need headless auth; a scoped token lets an agent omit the project argument |
-| UI auth | **None by default** (single user; ports bind to 127.0.0.1). Optional HTTP Basic via `APP_BASIC_AUTH=user:pass` in `src/proxy.ts` | Personal self-hosted tool; a minimal gate when exposed |
+| UI auth | **GitHub OAuth sign-in** (hand-rolled, `src/server/auth`), hashed DB sessions; each user owns their projects and MCP tokens. Optional outer HTTP Basic via `APP_BASIC_AUTH` in `src/proxy.ts` | Multi-user ownership was requested on 2026-10-09 |
 | UI kit | shadcn/ui (Radix, `radix-nova` preset, neutral), Tailwind 4, lucide-react, next-themes (light/dark/system), sonner toasts, Geist fonts from the `geist` package | Standard for Next; local fonts keep Docker builds offline-safe |
 | Client state | zustand 5 (vanilla store per open project) + **zundo** undo/redo over the document | Verified in `designer-store.ts` |
 | Rendering | **Cache Components on** (Next 16.4 default). DB reads go inside `<Suspense>` after `await connection()`. No `"use cache"` in v1 | Framework default; the data is always fresh |
@@ -57,7 +57,7 @@
 
 **In (v1):** everything in §1. That covers the projects list (create blank or from example, rename, duplicate, delete, import/export JSON) and the canvas designer (palette, nesting, typed connections, inspector forms for all kinds, undo/redo, autosave, validation panel, component status badges). It also covers the project sections (Overview, Stack, Conventions, Decisions, Brief preview, Versions with publish, diff and restore), the MCP tokens settings page, the full MCP surface, Docker and Compose, and README.
 
-**Out (later; don't build now):** user accounts, teams, sharing, permissions; real-time multi-user editing; OAuth for MCP; generating code inside the app; reverse-engineering a design from an existing repo; automatic layout (elkjs); canvas PNG/SVG export; comments; templates gallery beyond the one example; i18n; a native-app shell; host allow-listing / DNS-rebinding protection for the unauthenticated UI (document the localhost-only default instead).
+**Out (later; don't build now):** teams, sharing, permissions beyond per-user ownership; real-time multi-user editing; OAuth for MCP; generating code inside the app; reverse-engineering a design from an existing repo; automatic layout (elkjs); canvas PNG/SVG export; comments; templates gallery beyond the one example; i18n; a native-app shell; host allow-listing / DNS-rebinding protection for the unauthenticated UI (document the localhost-only default instead).
 
 ## 3. Tech stack (pinned, VERIFIED compatible on 2026-10-08)
 
@@ -896,7 +896,7 @@ All tabs edit the same store through `updateSections` and autosave like the canv
 
 ## 14. Security notes
 
-- **Exposure.** The UI and REST API are unauthenticated unless `APP_BASIC_AUTH` is set. Compose binds every port to 127.0.0.1. The README must say: don't expose the app beyond localhost without `APP_BASIC_AUTH` and TLS.
+- **Exposure.** The UI and REST API require a GitHub sign-in; each user sees only their own projects and tokens. Compose binds every port to 127.0.0.1. The README must say: don't expose the app beyond localhost without `APP_BASIC_AUTH` and TLS.
 - **Tokens.** MCP tokens carry 32 random bytes and only the SHA-256 hash is stored. The plaintext is shown once. Revocation is immediate; there is no caching of verification.
 - **Queries and limits.** All SQL goes through Drizzle (parameterised). JSON bodies are size-limited (§6.2). Every inbound document is validated by zod and the integrity checks.
 - **Rendering.** Render markdown and notes as text. No `dangerouslySetInnerHTML` anywhere.
@@ -906,7 +906,7 @@ All tabs edit the same store through `updateSections` and autosave like the canv
 
 ### Phase 7: Hardening and release (≈ 1.5 days)
 - [ ] README: what the app is, a screenshot (`docs/screenshot.png`, taken by Playwright), Docker quick start, development, connecting agents (§9.7), backup/restore (`docker compose exec db pg_dump -U design project_design > backup.sql` / `psql` restore), env vars table, and security notes (§14).
-- [ ] Run `/security-review` and fix the findings. Check that no `console.log` remains outside the `[migrate]`, `[mcp]`, `[api]` and `[health]` prefixes.
+- [ ] Run `/security-review` and fix the findings. Check that no `console.log` remains outside the `[migrate]`, `[mcp]`, `[api]`, `[auth]` and `[health]` prefixes.
 - [ ] Docker: `docker compose down -v && docker compose up -d --build --wait` from a clean clone (`git clone . /tmp/pd-clean`). The image stays under 350 MB, and a restart keeps the data.
 - [ ] Performance: with a 500-node synthetic design, `get_project_brief` stays under 200 ms locally (log the timing in a test, no assertion flakiness), and the design PUT stays under 300 ms.
 - **Accept:** everything in §16 passes from a clean clone.

@@ -6,13 +6,24 @@ import { PUT as putDesign } from "@/app/api/projects/[slug]/design/route";
 import { getDb } from "@/server/db/client";
 import { createProject, getProject } from "@/server/services/projects";
 import { createToken } from "@/server/services/tokens";
-import { resetDb } from "./helpers/db";
+import { resetDb, testUser } from "./helpers/db";
 import { syntheticDesign } from "./helpers/synthetic-design";
 
 vi.mock("next/server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("next/server")>()),
   connection: async () => {},
 }));
+// The design PUT reads the session cookie; act as the test user.
+vi.mock("@/server/auth/current", async () => {
+  const { testUser } = await import("./helpers/db");
+  return {
+    requirePrincipal: async () => ({
+      userId: (await testUser()).id,
+      tokenId: null,
+      projectId: null,
+    }),
+  };
+});
 
 const routeFetch = async (input: string | URL | Request, init?: RequestInit) => {
   const request = new Request(input, init);
@@ -32,8 +43,13 @@ describe("performance with a 500-node design", () => {
 
   it("renders the brief and saves the draft quickly", async () => {
     expect(design.nodes).toHaveLength(496);
-    await createProject(db, { name: "Big", slug: "big", document: design as never });
-    const { token } = await createToken(db, { name: "perf" });
+    await createProject(db, {
+      ownerId: (await testUser()).id,
+      name: "Big",
+      slug: "big",
+      document: design as never,
+    });
+    const { token } = await createToken(db, { userId: (await testUser()).id, name: "perf" });
     const client = new Client({ name: "perf", version: "0.0.0" });
     await client.connect(
       new StreamableHTTPClientTransport(new URL("http://localhost:3000/api/mcp"), {

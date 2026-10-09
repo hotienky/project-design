@@ -8,7 +8,13 @@ export default defineConfig({
   testDir: "e2e",
   fullyParallel: false,
   workers: 1,
-  use: { baseURL: `http://127.0.0.1:${PORT}`, trace: "retain-on-failure" },
+  globalSetup: "./e2e/global-setup.ts",
+  use: {
+    baseURL: `http://127.0.0.1:${PORT}`,
+    trace: "retain-on-failure",
+    // Signed in as the e2e user (see e2e/global-setup.ts).
+    storageState: "playwright/.auth/state.json",
+  },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command: "node scripts/start-standalone.mjs",

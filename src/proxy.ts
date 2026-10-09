@@ -1,18 +1,44 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+// Mirrors SESSION_COOKIE in src/server/auth/sessions.ts (the proxy stays free of server imports).
+const SESSION_COOKIE = "pd_session";
+// Pages and APIs that need a signed-in user. The landing page and /api/auth/* stay public.
+const SIGNED_IN_ONLY = /^\/(projects|settings|api\/projects)(\/|$)/;
+
 /**
- * Optional HTTP Basic auth for the UI and REST routes (APP_BASIC_AUTH="user:pass").
+ * Optional HTTP Basic auth for the UI and REST routes (APP_BASIC_AUTH="user:pass"), then an
+ * optimistic sign-in check: no session cookie on a signed-in-only path goes to the landing page
+ * (or 401 for APIs). The session itself is verified on the server (src/server/auth/current.ts).
  * /api/mcp authenticates with bearer tokens and /api/health must stay open for
  * the container healthcheck, so the matcher skips both.
  */
 export function proxy(request: NextRequest) {
+  const denied = checkBasicAuth(request);
+  if (denied) return denied;
+
+  const { pathname, search } = request.nextUrl;
+  if (SIGNED_IN_ONLY.test(pathname) && !request.cookies.get(SESSION_COOKIE)?.value) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: { code: "UNAUTHORIZED", message: "Sign in to continue" } },
+        { status: 401 },
+      );
+    }
+    const landing = new URL("/", request.url);
+    landing.searchParams.set("next", pathname + search);
+    return NextResponse.redirect(landing);
+  }
+  return NextResponse.next();
+}
+
+function checkBasicAuth(request: NextRequest): NextResponse | null {
   const expected = process.env.APP_BASIC_AUTH;
-  if (!expected) return NextResponse.next();
+  if (!expected) return null;
 
   const header = request.headers.get("authorization") ?? "";
   const [scheme, encoded] = header.split(" ");
   if (scheme === "Basic" && encoded && safeEqual(decodeBase64(encoded), expected)) {
-    return NextResponse.next();
+    return null;
   }
   return new NextResponse("Authentication required", {
     status: 401,

@@ -15,7 +15,7 @@ export async function setComponentStatus(
   projectId: string,
   nodeId: string,
   input: { status: ComponentStatus; note?: string },
-  tokenId?: string,
+  tokenId?: string | null,
 ): Promise<void> {
   const values = {
     status: input.status,

@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { fail, type ActionResult } from "@/app/actions/types";
 import type { DesignDocument } from "@/lib/design/schema";
+import { requirePrincipal } from "@/server/auth/current";
 import { getDb } from "@/server/db/client";
 import { publishVersion, restoreVersion } from "@/server/services/versions";
 
@@ -23,7 +24,7 @@ export async function publishVersionAction(
     return { ok: false, error: { code: "VALIDATION", message: parsed.error.issues[0]!.message } };
   }
   try {
-    const { version } = await publishVersion(getDb(), slug, parsed.data);
+    const { version } = await publishVersion(getDb(), slug, parsed.data, await requirePrincipal());
     refresh();
     return { ok: true, version };
   } catch (error) {
@@ -38,7 +39,13 @@ export async function restoreVersionAction(
   revision: number,
 ): Promise<ActionResult<{ revision: number; document: DesignDocument }>> {
   try {
-    const restored = await restoreVersion(getDb(), slug, version, { revision });
+    const restored = await restoreVersion(
+      getDb(),
+      slug,
+      version,
+      { revision },
+      await requirePrincipal(),
+    );
     refresh();
     return { ok: true, ...restored };
   } catch (error) {

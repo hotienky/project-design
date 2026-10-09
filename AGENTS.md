@@ -31,5 +31,7 @@ over MCP at `/api/mcp`. Work in progress is planned in `CURRENT_PLAN.md`.
   stores never import `@/server/*` (ESLint enforces both).
 - Cache Components is on: read the database inside `<Suspense>`; call `await connection()`
   before uncached reads that use no request API, including in GET route handlers.
+- Projects belong to users. Pages, server actions and REST routes get the signed-in principal
+  from `src/server/auth/current.ts` and pass it to every service call that takes a slug.
 - Never edit `drizzle/` by hand; generate migrations.
 - UI is shadcn/ui (`src/components/ui`, generated — don't hand-edit), Tailwind 4, lucide icons.

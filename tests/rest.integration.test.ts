@@ -9,19 +9,28 @@ import { GET as getStatus } from "@/app/api/projects/[slug]/status/route";
 import { renderBrief } from "@/lib/design/brief";
 import { teamTasksDesign } from "@/lib/design/examples/team-tasks";
 import { parseDesign } from "@/lib/design/integrity";
+import { SESSION_COOKIE, createSession } from "@/server/auth/sessions";
 import { getDb } from "@/server/db/client";
 import { createProject } from "@/server/services/projects";
 import { setComponentStatus } from "@/server/services/status";
 import { publishVersion } from "@/server/services/versions";
-import { resetDb } from "./helpers/db";
+import { resetDb, testUser } from "./helpers/db";
 
-// connection() only works inside a Next request; handlers are called directly here.
+// connection() and cookies() only work inside a Next request; handlers are called directly here.
 vi.mock("next/server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("next/server")>()),
   connection: async () => {},
 }));
+let sessionCookie = "";
+vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    get: (name: string) =>
+      name === SESSION_COOKIE && sessionCookie ? { value: sessionCookie } : undefined,
+  }),
+}));
 
 const db = getDb();
+let owner = "";
 const ctx = (slug: string) => ({ params: Promise.resolve({ slug }) });
 const url = (path: string) => `http://localhost:3000${path}`;
 const json = (method: string, path: string, body: unknown, headers: HeadersInit = {}) =>
@@ -33,10 +42,35 @@ const json = (method: string, path: string, body: unknown, headers: HeadersInit 
 const doc = parseDesign(teamTasksDesign);
 
 describe("REST routes", () => {
-  beforeEach(resetDb);
+  beforeEach(async () => {
+    await resetDb();
+    const user = await testUser();
+    owner = user.id;
+    sessionCookie = (await createSession(db, user.id)).token;
+  });
+
+  it("answers 401 without a session and 404 for another user's project", async () => {
+    await createProject(db, { name: "P", ownerId: owner });
+    sessionCookie = "";
+    const anonymous = await getDesign(new Request(url("/x")), ctx("p"));
+    expect(anonymous.status).toBe(401);
+    expect((await importRoute(json("POST", "/i", teamTasksDesign))).status).toBe(401);
+
+    sessionCookie = (await createSession(db, (await testUser("bob", 2)).id)).token;
+    for (const res of [
+      await getDesign(new Request(url("/x")), ctx("p")),
+      await putDesign(json("PUT", "/x", { revision: 1, document: doc }), ctx("p")),
+      await getRevision(new Request(url("/x")), ctx("p")),
+      await getExport(new Request(url("/x")), ctx("p")),
+      await getBrief(new Request(url("/x")), ctx("p")),
+      await getStatus(new Request(url("/x")), ctx("p")),
+    ]) {
+      expect(res.status).toBe(404);
+    }
+  });
 
   it("GET design returns revision and document", async () => {
-    await createProject(db, { name: "Team Tasks", document: teamTasksDesign });
+    await createProject(db, { ownerId: owner, name: "Team Tasks", document: teamTasksDesign });
     const res = await getDesign(
       new Request(url("/api/projects/team-tasks/design")),
       ctx("team-tasks"),
@@ -51,7 +85,7 @@ describe("REST routes", () => {
   });
 
   it("PUT design saves, then answers 409 for a stale revision", async () => {
-    await createProject(db, { name: "P" });
+    await createProject(db, { ownerId: owner, name: "P" });
     const path = "/api/projects/p/design";
     const ok = await putDesign(json("PUT", path, { revision: 1, document: doc }), ctx("p"));
     expect(ok.status).toBe(200);
@@ -65,7 +99,7 @@ describe("REST routes", () => {
   });
 
   it("GET revision tracks saves and answers 404 for an unknown project", async () => {
-    await createProject(db, { name: "P" });
+    await createProject(db, { ownerId: owner, name: "P" });
     const read = async () =>
       (await (await getRevision(new Request(url("/api/projects/p/revision")), ctx("p"))).json())
         .revision;
@@ -80,7 +114,7 @@ describe("REST routes", () => {
   });
 
   it("PUT design answers 422 with issues and 413 for a huge body", async () => {
-    await createProject(db, { name: "P" });
+    await createProject(db, { ownerId: owner, name: "P" });
     const path = "/api/projects/p/design";
     const invalid = { ...doc, edges: [{ id: "e", kind: "depends_on", source: "a", target: "b" }] };
     const bad = await putDesign(json("PUT", path, { revision: 1, document: invalid }), ctx("p"));
@@ -99,7 +133,7 @@ describe("REST routes", () => {
   });
 
   it("export sets download headers and the envelope round-trips through import", async () => {
-    await createProject(db, { name: "Team Tasks", document: teamTasksDesign });
+    await createProject(db, { ownerId: owner, name: "Team Tasks", document: teamTasksDesign });
     await publishVersion(db, "team-tasks", { label: "v1" });
     const res = await getExport(new Request(url("/e?version=latest")), ctx("team-tasks"));
     expect(res.status).toBe(200);
@@ -130,7 +164,11 @@ describe("REST routes", () => {
   });
 
   it("brief is markdown that matches the renderer, including statuses", async () => {
-    const project = await createProject(db, { name: "Team Tasks", document: teamTasksDesign });
+    const project = await createProject(db, {
+      ownerId: owner,
+      name: "Team Tasks",
+      document: teamTasksDesign,
+    });
     await setComponentStatus(db, project.id, "svc_api", { status: "done" });
     const res = await getBrief(new Request(url("/b")), ctx("team-tasks"));
     expect(res.headers.get("content-type")).toBe("text/markdown; charset=utf-8");
@@ -147,7 +185,11 @@ describe("REST routes", () => {
   });
 
   it("status lists current statuses and ignores deleted nodes", async () => {
-    const project = await createProject(db, { name: "P", document: teamTasksDesign });
+    const project = await createProject(db, {
+      ownerId: owner,
+      name: "P",
+      document: teamTasksDesign,
+    });
     await setComponentStatus(db, project.id, "svc_api", { status: "blocked", note: "why" });
     await setComponentStatus(db, project.id, "gone", { status: "done" });
     const res = await getStatus(new Request(url("/s")), ctx("p"));

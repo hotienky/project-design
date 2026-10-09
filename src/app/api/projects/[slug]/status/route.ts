@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 
+import { requirePrincipal } from "@/server/auth/current";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { getProject } from "@/server/services/projects";
@@ -9,7 +10,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/projects/[s
   await connection();
   try {
     const db = getDb();
-    const project = await getProject(db, (await ctx.params).slug);
+    const project = await getProject(db, (await ctx.params).slug, await requirePrincipal());
     const known = new Set(project.document.nodes.map((n) => n.id));
     const statuses = await getStatuses(db, project.id);
     return Response.json({

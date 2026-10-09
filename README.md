@@ -63,7 +63,11 @@ docker compose up -d --build --wait
 open http://localhost:3000        # or xdg-open on Linux
 ```
 
-Create a project (try **Example: Team Tasks**), then connect an agent (below). Data lives in the
+Sign in with GitHub, create a project (try **Example: Team Tasks**), then connect an agent
+(below). Sign-in needs a GitHub OAuth app (**GitHub → Settings → Developer settings → OAuth
+Apps**) whose callback URL is `<APP_URL>/api/auth/github/callback`; pass its credentials as
+`GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` (for example in a `.env` file next to
+`compose.yaml`). Data lives in the
 `pgdata` Docker volume; `docker compose down` keeps it, `docker compose down -v` deletes it.
 The app and the database bind to `127.0.0.1` only. Change the ports with `APP_PORT` and
 `DB_PORT`.
@@ -164,18 +168,23 @@ from the projects page.
 | `DATABASE_URL`    | `postgres://design:design@localhost:5434/project_design` (dev)    | Postgres connection string (Compose sets it for the app)             |
 | `DATABASE_URL_TEST` | `…/project_design_test`                                         | Database for integration and e2e tests                               |
 | `APP_URL`         | `http://localhost:3000`                                           | Base URL shown in the connection snippets                            |
-| `APP_BASIC_AUTH`  | _(empty)_                                                         | `user:password`; when set, the UI and REST API require HTTP Basic auth |
+| `APP_BASIC_AUTH`  | _(empty)_                                                         | `user:password`; when set, the UI and REST API also require HTTP Basic auth |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | _(empty)_                                | GitHub OAuth app used for sign-in; callback `<APP_URL>/api/auth/github/callback` |
+| `GITHUB_ALLOWED_USERS` | _(empty)_                                                    | Comma-separated GitHub logins allowed to sign in; empty allows any account |
 | `MIGRATE_ON_START` | `true`                                                           | Run migrations when the server starts                                |
 | `APP_PORT`, `DB_PORT` | `3000`, `5434`                                                | Host ports used by `compose.yaml`                             |
 
 ## Security
 
-- The UI and the REST API have **no accounts**: it is a single-user tool. Just you and your
-  architecture, as nature intended. Compose binds every
-  port to `127.0.0.1`. **Don't expose it beyond localhost without `APP_BASIC_AUTH` and TLS.**
-- MCP requests need a bearer token. Only the SHA-256 of a token is stored, the plaintext is shown
-  once, and revoking a token takes effect immediately. A project-scoped token cannot see other
-  projects.
+- The UI and the REST API need a **GitHub sign-in**. Each account sees only its own projects
+  and MCP tokens. Sessions are HTTP-only cookies; only their SHA-256 is stored. Projects and
+  tokens created before sign-in existed belong to the first account that signs in. Compose binds
+  every port to `127.0.0.1`. If you expose the app, serve it over TLS (set an `https://`
+  `APP_URL` so cookies are `Secure`) and set `GITHUB_ALLOWED_USERS` unless anyone with a GitHub
+  account may sign up.
+- MCP requests need a bearer token. A token acts for the account that created it. Only the
+  SHA-256 of a token is stored, the plaintext is shown once, and revoking a token takes effect
+  immediately. A project-scoped token cannot see other projects.
 - Every inbound document is validated (schema plus integrity rules) and JSON bodies are
   size-limited; all SQL goes through Drizzle (parameterised); user text is rendered as text,
   never as HTML.

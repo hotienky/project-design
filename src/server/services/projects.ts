@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 
 import { readImport, toEnvelope, type ExportEnvelope } from "@/lib/design/export-format";
 import { emptyDesign, type DesignDocument, type DesignDocumentInput } from "@/lib/design/schema";
@@ -20,6 +20,18 @@ function isUniqueViolation(error: unknown): boolean {
   return e?.code === "23505" || e?.cause?.code === "23505";
 }
 
+/**
+ * The projects a principal may see: its user's, narrowed to one project for a scoped token.
+ * No principal means a trusted internal caller (tests, scripts) that sees every project.
+ */
+export function visibleTo(principal?: Principal): SQL | undefined {
+  if (!principal) return undefined;
+  return and(
+    eq(projects.ownerId, principal.userId),
+    principal.projectId ? eq(projects.id, principal.projectId) : undefined,
+  );
+}
+
 export async function listProjects(db: Db, principal?: Principal) {
   return db
     .select({
@@ -37,31 +49,39 @@ export async function listProjects(db: Db, principal?: Principal) {
       updatedAt: projects.updatedAt,
     })
     .from(projects)
-    .where(principal?.projectId ? eq(projects.id, principal.projectId) : undefined)
+    .where(visibleTo(principal))
     .orderBy(desc(projects.updatedAt));
 }
 
 /** The row, or null. Kept for callers that handle absence themselves. */
-export async function getProjectBySlug(db: Db, slug: string) {
-  const [row] = await db.select().from(projects).where(eq(projects.slug, slug)).limit(1);
+export async function getProjectBySlug(db: Db, slug: string, principal?: Principal) {
+  const [row] = await db
+    .select()
+    .from(projects)
+    .where(and(eq(projects.slug, slug), visibleTo(principal)))
+    .limit(1);
   return row ?? null;
 }
 
-/** The row, or NOT_FOUND. A scoped principal only sees its own project. */
+/** The row, or NOT_FOUND. A principal only sees its own projects (or its token's one project). */
 export async function getProject(db: Db, slug: string, principal?: Principal): Promise<ProjectRow> {
-  const row = await getProjectBySlug(db, slug);
-  if (!row || (principal?.projectId && row.id !== principal.projectId)) {
+  const row = await getProjectBySlug(db, slug, principal);
+  if (!row) {
     throw new AppError("NOT_FOUND", `Unknown project "${slug}"`);
   }
   return row;
 }
 
 /** Just the draft revision (cheap: no document), or NOT_FOUND. Polled by open designers. */
-export async function getDraftRevision(db: Db, slug: string): Promise<number> {
+export async function getDraftRevision(
+  db: Db,
+  slug: string,
+  principal?: Principal,
+): Promise<number> {
   const [row] = await db
     .select({ revision: projects.revision })
     .from(projects)
-    .where(eq(projects.slug, slug))
+    .where(and(eq(projects.slug, slug), visibleTo(principal)))
     .limit(1);
   if (!row) throw new AppError("NOT_FOUND", `Unknown project "${slug}"`);
   return row.revision;
@@ -74,6 +94,7 @@ export async function createProject(
     slug?: string;
     description?: string;
     document?: DesignDocumentInput | DesignDocument;
+    ownerId?: string | null;
   },
 ): Promise<ProjectRow> {
   const base = input.slug ?? slugify(input.name);
@@ -88,6 +109,7 @@ export async function createProject(
           name: input.name,
           slug: attempt === 1 ? base : `${base}-${attempt}`,
           description: input.description ?? "",
+          ownerId: input.ownerId ?? null,
           document,
         })
         .returning();
@@ -104,6 +126,7 @@ export async function updateProjectMeta(
   db: Db,
   slug: string,
   patch: { name?: string; description?: string; slug?: string },
+  principal?: Principal,
 ): Promise<ProjectRow> {
   if (patch.slug !== undefined && !isValidSlug(patch.slug)) {
     throw new AppError("VALIDATION", `Invalid slug "${patch.slug}"`);
@@ -113,9 +136,13 @@ export async function updateProjectMeta(
     ...(patch.description !== undefined ? { description: patch.description } : {}),
     ...(patch.slug !== undefined ? { slug: patch.slug } : {}),
   };
-  if (Object.keys(set).length === 0) return getProject(db, slug);
+  if (Object.keys(set).length === 0) return getProject(db, slug, principal);
   try {
-    const [row] = await db.update(projects).set(set).where(eq(projects.slug, slug)).returning();
+    const [row] = await db
+      .update(projects)
+      .set(set)
+      .where(and(eq(projects.slug, slug), visibleTo(principal)))
+      .returning();
     if (!row) throw new AppError("NOT_FOUND", `Unknown project "${slug}"`);
     return row;
   } catch (error) {
@@ -126,24 +153,26 @@ export async function updateProjectMeta(
   }
 }
 
-/** Copies the draft only; versions, tokens and statuses are not copied. */
+/** Copies the draft only; versions, tokens and statuses are not copied. The copy belongs to the principal. */
 export async function duplicateProject(
   db: Db,
   slug: string,
   input: { name: string },
+  principal?: Principal,
 ): Promise<ProjectRow> {
-  const source = await getProject(db, slug);
+  const source = await getProject(db, slug, principal);
   return createProject(db, {
     name: input.name,
     description: source.description,
     document: source.document,
+    ownerId: principal?.userId ?? source.ownerId,
   });
 }
 
-export async function deleteProject(db: Db, slug: string): Promise<void> {
+export async function deleteProject(db: Db, slug: string, principal?: Principal): Promise<void> {
   const deleted = await db
     .delete(projects)
-    .where(eq(projects.slug, slug))
+    .where(and(eq(projects.slug, slug), visibleTo(principal)))
     .returning({ id: projects.id });
   if (deleted.length === 0) throw new AppError("NOT_FOUND", `Unknown project "${slug}"`);
 }
@@ -153,6 +182,7 @@ export async function saveDraft(
   db: Db,
   slug: string,
   input: { revision: number; document: unknown },
+  principal?: Principal,
 ): Promise<{ revision: number; updatedAt: Date }> {
   const parsed = safeParseDesign(input.document);
   if (!parsed.ok) throw new AppError("VALIDATION", "The design is invalid", parsed.issues);
@@ -164,18 +194,25 @@ export async function saveDraft(
       revision: sql`${projects.revision} + 1`,
       updatedAt: sql`now()`,
     })
-    .where(and(eq(projects.slug, slug), eq(projects.revision, input.revision)))
+    .where(
+      and(eq(projects.slug, slug), eq(projects.revision, input.revision), visibleTo(principal)),
+    )
     .returning({ revision: projects.revision, updatedAt: projects.updatedAt });
   if (row) return row;
 
-  const current = await getProjectBySlug(db, slug);
+  const current = await getProjectBySlug(db, slug, principal);
   if (!current) throw new AppError("NOT_FOUND", `Unknown project "${slug}"`);
   throw new AppError("CONFLICT", "The design was changed elsewhere", {
     currentRevision: current.revision,
   });
 }
 
-export async function importProject(db: Db, json: unknown): Promise<ProjectRow> {
+/** Creates a project from an export envelope or bare document, owned by the principal's user. */
+export async function importProject(
+  db: Db,
+  json: unknown,
+  principal?: Principal,
+): Promise<ProjectRow> {
   const { project, document } = readImport(json);
   const parsed = safeParseDesign(document);
   if (!parsed.ok) throw new AppError("VALIDATION", "The file is not a valid design", parsed.issues);
@@ -184,6 +221,7 @@ export async function importProject(db: Db, json: unknown): Promise<ProjectRow> 
     slug: project && isValidSlug(project.slug) ? project.slug : undefined,
     description: project?.description,
     document: parsed.document,
+    ownerId: principal?.userId,
   });
 }
 

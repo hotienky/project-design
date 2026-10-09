@@ -9,7 +9,7 @@ import { getDb } from "@/server/db/client";
 import { createProject, getProject, saveDraft } from "@/server/services/projects";
 import { createToken } from "@/server/services/tokens";
 import { publishVersion } from "@/server/services/versions";
-import { resetDb } from "./helpers/db";
+import { resetDb, testUser } from "./helpers/db";
 
 const MCP_URL = new URL("http://localhost:3000/api/mcp");
 const db = getDb();
@@ -37,11 +37,12 @@ const json = (r: Result) => JSON.parse(raw(r));
 
 async function seed() {
   const project = await createProject(db, {
+    ownerId: (await testUser()).id,
     name: "Team Tasks",
     description: "Task tracker for small teams, with email notifications.",
     document: teamTasksDesign,
   });
-  const { token } = await createToken(db, { name: "all" });
+  const { token } = await createToken(db, { userId: (await testUser()).id, name: "all" });
   return { project, client: await connect(token) };
 }
 
@@ -130,7 +131,11 @@ describe("MCP tools", () => {
 
   it("reports ambiguous and unknown references as tool errors", async () => {
     const { project, client } = await seed();
-    await createProject(db, { name: "Other", document: { schemaVersion: 1 } });
+    await createProject(db, {
+      ownerId: (await testUser()).id,
+      name: "Other",
+      document: { schemaVersion: 1 },
+    });
 
     const several = await call(client, "get_project_brief");
     expect(several.isError).toBe(true);
@@ -245,8 +250,16 @@ describe("MCP tools", () => {
 
   it("lets a scoped token omit the project", async () => {
     const { project } = await seed();
-    await createProject(db, { name: "Other", document: { schemaVersion: 1 } });
-    const scoped = await createToken(db, { name: "scoped", projectId: project.id });
+    await createProject(db, {
+      ownerId: (await testUser()).id,
+      name: "Other",
+      document: { schemaVersion: 1 },
+    });
+    const scoped = await createToken(db, {
+      userId: (await testUser()).id,
+      name: "scoped",
+      projectId: project.id,
+    });
     const client = await connect(scoped.token);
     expect(raw(await call(client, "get_project_brief"))).toContain("# Team Tasks — design brief");
     const other = await call(client, "get_project_brief", { project: "other" });
@@ -457,8 +470,16 @@ describe("MCP edit tools", () => {
 
   it("a scoped token cannot edit another project", async () => {
     const { project } = await seed();
-    await createProject(db, { name: "Other", document: { schemaVersion: 1 } });
-    const scoped = await createToken(db, { name: "scoped", projectId: project.id });
+    await createProject(db, {
+      ownerId: (await testUser()).id,
+      name: "Other",
+      document: { schemaVersion: 1 },
+    });
+    const scoped = await createToken(db, {
+      userId: (await testUser()).id,
+      name: "scoped",
+      projectId: project.id,
+    });
     const client = await connect(scoped.token);
     const denied = await call(client, "add_component", {
       project: "other",
@@ -490,7 +511,11 @@ describe("MCP prompts and resources", () => {
     expect(text).toContain('implementing the project "Team Tasks" (`team-tasks`)');
     expect(text).toContain("get_build_plan");
 
-    await createProject(db, { name: "Other", document: { schemaVersion: 1 } });
+    await createProject(db, {
+      ownerId: (await testUser()).id,
+      name: "Other",
+      document: { schemaVersion: 1 },
+    });
     const ambiguous = await client.getPrompt({ name: "implement_design", arguments: {} });
     expect((ambiguous.messages[0]!.content as { text: string }).text).toContain(
       "implementing the project from",

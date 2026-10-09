@@ -1,10 +1,11 @@
 import { FolderOpen } from "lucide-react";
-import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { ImportButton } from "@/components/projects/import-button";
 import { NewProjectDialog } from "@/components/projects/new-project-dialog";
+import { MotionGrid } from "@/components/projects/motion-grid";
 import { ProjectCard } from "@/components/projects/project-card";
+import { requirePagePrincipal } from "@/server/auth/current";
 import { getDb } from "@/server/db/client";
 import { listProjects } from "@/server/services/projects";
 
@@ -18,8 +19,7 @@ function Actions() {
 }
 
 async function ProjectGrid() {
-  await connection();
-  const projects = await listProjects(getDb());
+  const projects = await listProjects(getDb(), await requirePagePrincipal());
   if (projects.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-20 text-center">
@@ -33,27 +33,26 @@ async function ProjectGrid() {
     );
   }
   return (
-    <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <MotionGrid>
       {projects.map((p) => (
-        <li key={p.slug}>
-          <ProjectCard
-            project={{
-              slug: p.slug,
-              name: p.name,
-              description: p.description,
-              revision: p.revision,
-              latestVersion: p.latestVersion,
-              nodeCount: p.nodeCount,
-              updatedAt: p.updatedAt.toISOString(),
-            }}
-          />
-        </li>
+        <ProjectCard
+          key={p.slug}
+          project={{
+            slug: p.slug,
+            name: p.name,
+            description: p.description,
+            revision: p.revision,
+            latestVersion: p.latestVersion,
+            nodeCount: p.nodeCount,
+            updatedAt: p.updatedAt.toISOString(),
+          }}
+        />
       ))}
-    </ul>
+    </MotionGrid>
   );
 }
 
-export default function Home() {
+export default function ProjectsPage() {
   return (
     <main className="mx-auto w-full max-w-6xl p-6">
       <div className="mb-6 flex items-center justify-between">

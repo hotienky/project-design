@@ -71,3 +71,7 @@ export function parseVersionRef(value: string | null): "draft" | "latest" | numb
   if (Number.isInteger(n) && n > 0) return n;
   throw new AppError("VALIDATION", `Invalid version "${value}". Use draft, latest or a number.`);
 }
+
+/** A same-origin redirect. Relative, so it works whatever host the request came in on. */
+export const redirectTo = (path: string) =>
+  new Response(null, { status: 303, headers: { Location: path } });

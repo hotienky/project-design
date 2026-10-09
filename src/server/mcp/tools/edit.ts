@@ -103,10 +103,12 @@ async function editDraft<R>(
       );
     }
     try {
-      const saved = await saveDraft(ctx.db, slug, {
-        revision: draft.revision,
-        document: parsed.document,
-      });
+      const saved = await saveDraft(
+        ctx.db,
+        slug,
+        { revision: draft.revision, document: parsed.document },
+        ctx.principal,
+      );
       return { ...result, revision: saved.revision };
     } catch (error) {
       if (error instanceof AppError && error.code === "CONFLICT" && attempt < MAX_ATTEMPTS)
@@ -553,7 +555,12 @@ export function registerEditTools(server: McpServer, ctx: McpContext) {
         throw new ToolError(`The design is invalid:\n${issueList(parsed.issues)}`);
       }
       try {
-        const saved = await saveDraft(ctx.db, slug, { revision, document: parsed.document });
+        const saved = await saveDraft(
+          ctx.db,
+          slug,
+          { revision, document: parsed.document },
+          ctx.principal,
+        );
         return jsonResult({ revision: saved.revision });
       } catch (error) {
         if (error instanceof AppError && error.code === "CONFLICT") {

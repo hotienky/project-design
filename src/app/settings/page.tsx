@@ -1,18 +1,21 @@
-import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { ConnectSnippets } from "@/components/settings/connect-snippets";
 import { CreateTokenDialog } from "@/components/settings/create-token-dialog";
 import { TokensTable } from "@/components/settings/tokens-table";
+import { requirePagePrincipal } from "@/server/auth/current";
 import { getDb } from "@/server/db/client";
 import { env } from "@/server/env";
 import { listProjects } from "@/server/services/projects";
 import { listTokens } from "@/server/services/tokens";
 
 async function Tokens() {
-  await connection();
+  const principal = await requirePagePrincipal();
   const db = getDb();
-  const [tokens, projects] = await Promise.all([listTokens(db), listProjects(db)]);
+  const [tokens, projects] = await Promise.all([
+    listTokens(db, principal.userId),
+    listProjects(db, principal),
+  ]);
   const names = new Map(projects.map((p) => [p.id, p.name]));
   const { APP_URL } = env();
   return (

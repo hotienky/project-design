@@ -6,7 +6,7 @@ import { TEAM_TASKS_EXAMPLE, teamTasksDesign } from "@/lib/design/examples/team-
 import { getDb } from "@/server/db/client";
 import { createProject } from "@/server/services/projects";
 import { createToken, revokeToken } from "@/server/services/tokens";
-import { resetDb } from "./helpers/db";
+import { resetDb, testUser } from "./helpers/db";
 
 const MCP_URL = new URL("http://localhost:3000/api/mcp");
 
@@ -43,8 +43,12 @@ describe("MCP endpoint", () => {
 
   it("lists tools and reads a project", async () => {
     const db = getDb();
-    await createProject(db, { ...TEAM_TASKS_EXAMPLE, document: teamTasksDesign });
-    const { token } = await createToken(db, { name: "test" });
+    await createProject(db, {
+      ownerId: (await testUser()).id,
+      ...TEAM_TASKS_EXAMPLE,
+      document: teamTasksDesign,
+    });
+    const { token } = await createToken(db, { userId: (await testUser()).id, name: "test" });
     const client = await connect(token);
 
     const tools = await client.listTools();
@@ -86,9 +90,22 @@ describe("MCP endpoint", () => {
 
   it("scopes project tokens and honours revocation", async () => {
     const db = getDb();
-    const a = await createProject(db, { ...TEAM_TASKS_EXAMPLE, document: teamTasksDesign });
-    await createProject(db, { name: "Other", slug: "other", document: { schemaVersion: 1 } });
-    const scoped = await createToken(db, { name: "scoped", projectId: a.id });
+    const a = await createProject(db, {
+      ownerId: (await testUser()).id,
+      ...TEAM_TASKS_EXAMPLE,
+      document: teamTasksDesign,
+    });
+    await createProject(db, {
+      ownerId: (await testUser()).id,
+      name: "Other",
+      slug: "other",
+      document: { schemaVersion: 1 },
+    });
+    const scoped = await createToken(db, {
+      userId: (await testUser()).id,
+      name: "scoped",
+      projectId: a.id,
+    });
 
     const client = await connect(scoped.token);
     const projects = text(await client.callTool({ name: "list_projects", arguments: {} }));
@@ -100,7 +117,7 @@ describe("MCP endpoint", () => {
     expect(other.isError).toBe(true);
     await client.close();
 
-    await revokeToken(db, scoped.id);
+    await revokeToken(db, scoped.id, (await testUser()).id);
     await expect(connect(scoped.token)).rejects.toThrow();
   });
 });

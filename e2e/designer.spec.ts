@@ -3,13 +3,18 @@ import { expect, test, type Page } from "@playwright/test";
 import { teamTasksDesign } from "@/lib/design/examples/team-tasks";
 import { createProject } from "@/server/services/projects";
 import type { DesignDocument } from "@/lib/design/schema";
-import { resetDatabase, syntheticDesign, withDb } from "./helpers";
+import { resetDatabase, syntheticDesign, withDb, ownerId } from "./helpers";
+
+let owner = "";
+test.beforeAll(async () => {
+  owner = await ownerId();
+});
 
 const SLUG = "designer";
 
 test.beforeEach(async () => {
   await resetDatabase();
-  await withDb((db) => createProject(db, { name: "Designer", slug: SLUG }));
+  await withDb((db) => createProject(db, { ownerId: owner, name: "Designer", slug: SLUG }));
 });
 test.afterAll(resetDatabase);
 
@@ -211,7 +216,12 @@ test("opens a 300-node design without console errors", async ({ page }) => {
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   page.on("pageerror", (e) => errors.push(e.message));
   await withDb((db) =>
-    createProject(db, { name: "Big", slug: "big", document: syntheticDesign() as never }),
+    createProject(db, {
+      ownerId: owner,
+      name: "Big",
+      slug: "big",
+      document: syntheticDesign() as never,
+    }),
   );
   const started = Date.now();
   await page.setViewportSize({ width: 1700, height: 1000 });
@@ -226,7 +236,12 @@ test("every inspector form renders, and edits keep the design valid", async ({ p
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   page.on("pageerror", (e) => errors.push(e.message));
   await withDb((db) =>
-    createProject(db, { name: "Example", slug: "example", document: teamTasksDesign }),
+    createProject(db, {
+      ownerId: owner,
+      name: "Example",
+      slug: "example",
+      document: teamTasksDesign,
+    }),
   );
   await page.setViewportSize({ width: 1700, height: 1000 });
   await page.goto("/projects/example");
@@ -328,7 +343,12 @@ test("levels view drills from project to service to a controller's endpoints", a
     ],
   };
   await withDb((db) =>
-    createProject(db, { name: "Drill down", slug: "levels", document: document as never }),
+    createProject(db, {
+      ownerId: owner,
+      name: "Drill down",
+      slug: "levels",
+      document: document as never,
+    }),
   );
   await page.setViewportSize({ width: 1700, height: 1000 });
   await page.goto("/projects/levels");

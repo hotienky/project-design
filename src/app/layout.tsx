@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
+import { Suspense } from "react";
 
+import { Account } from "@/app/account";
 import { TopBar } from "@/components/app-shell/top-bar";
 import { Providers } from "@/components/providers";
 import "./globals.css";
@@ -20,7 +22,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex h-dvh flex-col">
         <Providers>
-          <TopBar />
+          <TopBar
+            account={
+              <Suspense fallback={<div className="ml-auto" />}>
+                <Account />
+              </Suspense>
+            }
+          />
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
         </Providers>
       </body>

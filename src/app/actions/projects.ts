@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { teamTasksDesign } from "@/lib/design/examples/team-tasks";
 import { fail, type ActionResult } from "@/app/actions/types";
+import { requirePrincipal } from "@/server/auth/current";
 import { getDb } from "@/server/db/client";
 import { AppError } from "@/server/errors";
 import {
@@ -41,7 +42,9 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
   if (!parsed.success) return invalid(parsed.error);
   let slug: string;
   try {
+    const { userId } = await requirePrincipal();
     const project = await createProject(getDb(), {
+      ownerId: userId,
       name: parsed.data.name,
       description: parsed.data.description,
       document: parsed.data.template === "example" ? teamTasksDesign : undefined,
@@ -57,7 +60,7 @@ export async function renameProjectAction(slug: string, input: unknown): Promise
   const parsed = z.object({ name: Name }).safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
   try {
-    await updateProjectMeta(getDb(), slug, { name: parsed.data.name });
+    await updateProjectMeta(getDb(), slug, { name: parsed.data.name }, await requirePrincipal());
   } catch (error) {
     return fail(error);
   }
@@ -72,7 +75,12 @@ export async function duplicateProjectAction(
   const parsed = z.object({ name: Name }).safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
   try {
-    const copy = await duplicateProject(getDb(), slug, { name: parsed.data.name });
+    const copy = await duplicateProject(
+      getDb(),
+      slug,
+      { name: parsed.data.name },
+      await requirePrincipal(),
+    );
     refresh();
     return { ok: true, slug: copy.slug };
   } catch (error) {
@@ -82,7 +90,7 @@ export async function duplicateProjectAction(
 
 export async function deleteProjectAction(slug: string): Promise<ActionResult> {
   try {
-    await deleteProject(getDb(), slug);
+    await deleteProject(getDb(), slug, await requirePrincipal());
   } catch (error) {
     if (error instanceof AppError && error.code === "NOT_FOUND") {
       refresh();

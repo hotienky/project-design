@@ -10,6 +10,7 @@ import {
   deleteProject,
   duplicateProject,
   exportProject,
+  getDraftRevision,
   getProject,
   importProject,
   listProjects,
@@ -17,9 +18,9 @@ import {
   updateProjectMeta,
 } from "@/server/services/projects";
 import { createToken } from "@/server/services/tokens";
-import { publishVersion } from "@/server/services/versions";
+import { listVersions, publishVersion } from "@/server/services/versions";
 import { setComponentStatus } from "@/server/services/status";
-import { resetDb } from "./helpers/db";
+import { resetDb, testUser } from "./helpers/db";
 
 const db = getDb();
 const example = () => parseDesign(teamTasksDesign);
@@ -180,7 +181,7 @@ describe("projects service", () => {
   it("deletes a project with its versions, tokens and statuses", async () => {
     const p = await createProject(db, { name: "Doomed", document: teamTasksDesign });
     await publishVersion(db, "doomed", {});
-    await createToken(db, { name: "scoped", projectId: p.id });
+    await createToken(db, { name: "scoped", userId: (await testUser()).id, projectId: p.id });
     await setComponentStatus(db, p.id, "svc_api", { status: "done" });
     await deleteProject(db, "doomed");
     const count = async (table: string) =>
@@ -193,10 +194,39 @@ describe("projects service", () => {
   });
 
   it("hides other projects from a scoped principal", async () => {
-    const a = await createProject(db, { name: "A" });
-    await createProject(db, { name: "B" });
-    const principal = { tokenId: "t", projectId: a.id };
+    const user = await testUser();
+    const a = await createProject(db, { name: "A", ownerId: user.id });
+    await createProject(db, { name: "B", ownerId: user.id });
+    const principal = { userId: user.id, tokenId: "t", projectId: a.id };
     expect((await listProjects(db, principal)).map((p) => p.slug)).toEqual(["a"]);
     expect((await rejection(getProject(db, "b", principal))).code).toBe("NOT_FOUND");
+  });
+
+  it("keeps each user's projects to themselves", async () => {
+    const alice = { userId: (await testUser()).id, tokenId: null, projectId: null };
+    const bob = { userId: (await testUser("bob", 2)).id, tokenId: null, projectId: null };
+    await createProject(db, { name: "Mine", ownerId: alice.userId, document: teamTasksDesign });
+
+    expect((await listProjects(db, alice)).map((p) => p.slug)).toEqual(["mine"]);
+    expect(await listProjects(db, bob)).toEqual([]);
+    for (const attempt of [
+      () => getProject(db, "mine", bob),
+      () => getDraftRevision(db, "mine", bob),
+      () => saveDraft(db, "mine", { revision: 1, document: teamTasksDesign }, bob),
+      () => updateProjectMeta(db, "mine", { name: "Taken" }, bob),
+      () => duplicateProject(db, "mine", { name: "Copy" }, bob),
+      () => deleteProject(db, "mine", bob),
+      () => publishVersion(db, "mine", {}, bob),
+      () => listVersions(db, "mine", bob),
+      () => exportProject(db, "mine", "draft", bob),
+    ]) {
+      expect((await rejection(attempt())).code).toBe("NOT_FOUND");
+    }
+    expect((await getProject(db, "mine", alice)).revision).toBe(1);
+
+    const copy = await duplicateProject(db, "mine", { name: "Copy" }, alice);
+    expect(copy.ownerId).toBe(alice.userId);
+    const imported = await importProject(db, { schemaVersion: 1 }, bob);
+    expect(imported.ownerId).toBe(bob.userId);
   });
 });

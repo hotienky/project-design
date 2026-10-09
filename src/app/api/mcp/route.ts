@@ -31,7 +31,7 @@ async function serve(request: Request): Promise<Response> {
   return handler.fetch(request, {
     authInfo: {
       token: match[1],
-      clientId: principal.tokenId,
+      clientId: principal.tokenId ?? principal.userId,
       scopes: [],
       extra: { principal },
     },

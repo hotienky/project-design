@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { DesignerStoreProvider } from "@/components/designer/store-provider";
 import { ProjectHeader } from "@/components/designer/project-header";
+import { requirePagePrincipal } from "@/server/auth/current";
 import { getDb } from "@/server/db/client";
 import { env } from "@/server/env";
 import { getProjectBySlug } from "@/server/services/projects";
@@ -15,7 +16,7 @@ async function ProjectShell({
   children: React.ReactNode;
 }) {
   const { slug } = await params;
-  const project = await getProjectBySlug(getDb(), slug);
+  const project = await getProjectBySlug(getDb(), slug, await requirePagePrincipal());
   if (!project) notFound();
   return (
     <DesignerStoreProvider

@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 
 import { renderBrief } from "@/lib/design/brief";
+import { requirePrincipal } from "@/server/auth/current";
 import { getDb } from "@/server/db/client";
 import { errorResponse, parseVersionRef } from "@/server/http";
 import { getStatuses } from "@/server/services/status";
@@ -12,7 +13,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/projects/[sl
     const { slug } = await ctx.params;
     const ref = parseVersionRef(new URL(request.url).searchParams.get("version"));
     const db = getDb();
-    const resolved = await resolveDocument(db, slug, ref);
+    const resolved = await resolveDocument(db, slug, ref, await requirePrincipal());
     const statuses = await getStatuses(db, resolved.project.id);
     const brief = renderBrief({
       project: resolved.project,

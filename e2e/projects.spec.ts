@@ -8,7 +8,7 @@ test.beforeEach(resetDatabase);
 test.afterAll(resetDatabase);
 
 async function createFromExample(page: Page, name: string) {
-  await page.goto("/");
+  await page.goto("/projects");
   await page.getByRole("button", { name: "New project" }).first().click();
   await page.getByLabel("Name").fill(name);
   await page.getByLabel("Example: Team Tasks").check();
@@ -29,7 +29,7 @@ test("creates a project from the example and shows it on the canvas", async ({ p
 
 test("renames, duplicates, exports, imports and deletes", async ({ page }) => {
   await createFromExample(page, "Alpha");
-  await page.goto("/");
+  await page.goto("/projects");
   await expect(page.getByText("21 components")).toBeVisible();
 
   await openMenu(page, "Alpha", "Rename");
@@ -50,7 +50,7 @@ test("renames, duplicates, exports, imports and deletes", async ({ page }) => {
 
   await page.locator('input[type="file"]').first().setInputFiles(file);
   await expect(page).toHaveURL(/\/projects\/alpha-2$/);
-  await page.goto("/");
+  await page.goto("/projects");
   await expect(page.getByRole("link", { name: /^Beta/ })).toHaveCount(3);
 
   await openMenu(page, "Beta copy", "Delete");
@@ -61,12 +61,12 @@ test("renames, duplicates, exports, imports and deletes", async ({ page }) => {
 });
 
 test("shows the empty state", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/projects");
   await expect(page.getByText("No designs yet")).toBeVisible();
 });
 
 test("rejects an invalid import with a message", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/projects");
   await page
     .locator('input[type="file"]')
     .first()

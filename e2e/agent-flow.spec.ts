@@ -3,14 +3,19 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { teamTasksDesign } from "@/lib/design/examples/team-tasks";
 import { createProject } from "@/server/services/projects";
-import { resetDatabase, withDb } from "./helpers";
+import { resetDatabase, withDb, ownerId } from "./helpers";
+
+let owner = "";
+test.beforeAll(async () => {
+  owner = await ownerId();
+});
 
 const SLUG = "example";
 
 test.beforeEach(async () => {
   await resetDatabase();
   await withDb((db) =>
-    createProject(db, { name: "Example", slug: SLUG, document: teamTasksDesign }),
+    createProject(db, { ownerId: owner, name: "Example", slug: SLUG, document: teamTasksDesign }),
   );
 });
 test.afterAll(resetDatabase);

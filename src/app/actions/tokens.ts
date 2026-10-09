@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 
 import { fail, type ActionResult } from "@/app/actions/types";
+import { requirePrincipal } from "@/server/auth/current";
 import { getDb } from "@/server/db/client";
 import { getProject } from "@/server/services/projects";
 import { createToken, revokeToken } from "@/server/services/tokens";
@@ -21,9 +22,16 @@ export async function createTokenAction(input: unknown): Promise<ActionResult<{ 
     return { ok: false, error: { code: "VALIDATION", message: parsed.error.issues[0]!.message } };
   }
   try {
+    const principal = await requirePrincipal();
     const db = getDb();
-    const project = parsed.data.projectSlug ? await getProject(db, parsed.data.projectSlug) : null;
-    const { token } = await createToken(db, { name: parsed.data.name, projectId: project?.id });
+    const project = parsed.data.projectSlug
+      ? await getProject(db, parsed.data.projectSlug, principal)
+      : null;
+    const { token } = await createToken(db, {
+      name: parsed.data.name,
+      userId: principal.userId,
+      projectId: project?.id,
+    });
     refresh();
     return { ok: true, token };
   } catch (error) {
@@ -35,7 +43,11 @@ export async function revokeTokenAction(id: string): Promise<ActionResult> {
   if (!z.uuid().safeParse(id).success) {
     return { ok: false, error: { code: "VALIDATION", message: "Invalid token id" } };
   }
-  await revokeToken(getDb(), id);
+  try {
+    await revokeToken(getDb(), id, (await requirePrincipal()).userId);
+  } catch (error) {
+    return fail(error);
+  }
   refresh();
   return { ok: true };
 }

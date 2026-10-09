@@ -5,7 +5,7 @@ import type { DesignDocument } from "@/lib/design/schema";
 import type { Db } from "@/server/db/client";
 import { projectVersions, projects } from "@/server/db/schema";
 import { AppError } from "@/server/errors";
-import { getProject, saveDraft } from "@/server/services/projects";
+import { getProject, saveDraft, visibleTo } from "@/server/services/projects";
 import type { Principal } from "@/server/services/tokens";
 
 export type VersionRef = "draft" | "latest" | number;
@@ -22,12 +22,13 @@ export async function publishVersion(
   db: Db,
   slug: string,
   input: { label?: string; notes?: string },
+  principal?: Principal,
 ): Promise<{ version: number; createdAt: Date }> {
   return db.transaction(async (tx) => {
     const [project] = await tx
       .select()
       .from(projects)
-      .where(eq(projects.slug, slug))
+      .where(and(eq(projects.slug, slug), visibleTo(principal)))
       .for("update")
       .limit(1);
     if (!project) throw new AppError("NOT_FOUND", `Unknown project "${slug}"`);
@@ -56,8 +57,8 @@ export async function publishVersion(
   });
 }
 
-export async function listVersions(db: Db, slug: string) {
-  const project = await getProject(db, slug);
+export async function listVersions(db: Db, slug: string, principal?: Principal) {
+  const project = await getProject(db, slug, principal);
   return db
     .select({
       version: projectVersions.version,
@@ -74,8 +75,8 @@ export async function listVersions(db: Db, slug: string) {
     .orderBy(desc(projectVersions.version));
 }
 
-export async function getVersion(db: Db, slug: string, version: number) {
-  const project = await getProject(db, slug);
+export async function getVersion(db: Db, slug: string, version: number, principal?: Principal) {
+  const project = await getProject(db, slug, principal);
   const [row] = await db
     .select()
     .from(projectVersions)
@@ -113,7 +114,7 @@ export async function resolveDocument(
       throw new AppError("NOT_FOUND", 'No published version yet; use version "draft"');
     }
   } else {
-    row = await getVersion(db, slug, ref);
+    row = await getVersion(db, slug, ref, principal);
   }
   return {
     project: meta,
@@ -129,8 +130,14 @@ export async function restoreVersion(
   slug: string,
   version: number,
   input: { revision: number },
+  principal?: Principal,
 ): Promise<{ revision: number; document: DesignDocument }> {
-  const row = await getVersion(db, slug, version);
-  const saved = await saveDraft(db, slug, { revision: input.revision, document: row.document });
+  const row = await getVersion(db, slug, version, principal);
+  const saved = await saveDraft(
+    db,
+    slug,
+    { revision: input.revision, document: row.document },
+    principal,
+  );
   return { revision: saved.revision, document: row.document };
 }
