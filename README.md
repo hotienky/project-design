@@ -1,11 +1,48 @@
 # Project Design
 
-Design a software project on a canvas — tech stack, architecture style, services, layers,
-modules, data model, APIs, queues and integrations — then let coding agents (Claude Code,
-Cursor, Codex, …) read that design over [MCP](https://modelcontextprotocol.io) and generate a
-codebase that matches it. Agents report progress back, and it shows up on the canvas.
+> **Tells the developer what the fuck is going on.**
+
+You open a repo. There are 40 folders, three of them are called `utils`, a service named
+`legacy-v2-new` and a queue nobody admits to owning. The AI agent you hired to help has, with
+total confidence, just invented a fourth architecture. Nobody knows what is going on.
+
+**Project Design fixes that.** You draw the project once — stack, architecture, services,
+layers, modules, databases, APIs, queues, third-party integrations — on a canvas. That drawing
+becomes the single source of truth, and coding agents (Claude Code, Cursor, Codex, …) read it
+over [MCP](https://modelcontextprotocol.io) before they write a single line. They build what you
+designed, not what they hallucinated, and they tick off each box on the canvas as they go.
 
 ![The designer showing the Team Tasks example](docs/screenshot.png)
+
+## Why bother
+
+- **For you:** one picture of the whole system. Which service talks to which, what lives in
+  which layer, which table belongs where. No archaeology required.
+- **For the new hire:** open the canvas, read the brief, understand the project before lunch
+  instead of before the next reorg.
+- **For the agent:** a typed, validated design with a dependency-ordered build plan, an OpenAPI
+  contract and a data model. Fewer "creative interpretations". Zero vibes-based architecture.
+- **For future you:** published versions with diffs, so "who changed the auth flow and why"
+  has an answer that isn't `git blame` and a sigh.
+
+## How it works (the 60-second tour)
+
+1. **Draw it.** Create a project (or start from **Example: Team Tasks** if a blank canvas
+   scares you). Drop services, nest layers and modules inside them, add datastores with
+   entities, APIs with operations, queues with channels, integrations and actors. Connect them
+   with typed edges — `calls`, `depends_on`, `publishes`, `subscribes` and friends.
+2. **Write down the boring-but-important stuff.** Tech stack, conventions, architecture
+   decisions (ADRs) and a markdown brief. The things everyone "just knows" until they quit.
+3. **Check it.** The validation panel yells about unused components, layer violations and
+   things that don't add up — before an agent cheerfully builds them.
+4. **Publish a version.** Freeze a snapshot so an agent can build against it while you keep
+   fiddling with the draft.
+5. **Point an agent at it.** Create an MCP token, connect your agent (see below) and run the
+   `implement_design` prompt. It reads the brief, follows the build plan component by component
+   and reports `in_progress` / `done` / `blocked` back to the canvas.
+6. **Watch the boxes turn green.** Or red. At least now you know _which_ box is on fire.
+
+## What's inside
 
 - **Canvas designer** (React Flow): services contain layers contain modules; datastores contain
   entities; typed connections (`depends_on`, `calls`, `exposes`, `accesses`, `publishes`,
@@ -13,10 +50,11 @@ codebase that matches it. Agents report progress back, and it shows up on the ca
   autosave, validation panel.
 - **Project sections**: overview, tech stack, conventions, architecture decisions, a markdown
   **brief**, and published **versions** with diff and restore.
-- **MCP server** at `/api/mcp`: 12 tools, 3 prompts, 3 resources. Agents get the brief, the raw
+- **MCP server** at `/api/mcp`: 23 tools, 3 prompts, 3 resources. Agents get the brief, the raw
   JSON, per-component context, an OpenAPI 3.1 contract, the data model (JSON or Mermaid), a
-  dependency-ordered build plan and the changes between versions.
-- **Self-hosted**: Next.js 16, PostgreSQL 18, one Docker Compose file.
+  dependency-ordered build plan and the changes between versions — and can edit the design too.
+- **Self-hosted**: Next.js 16, PostgreSQL 18, one Docker Compose file. Your architecture stays
+  on your machine, where it can't embarrass you in public.
 
 ## Quick start (Docker)
 
@@ -58,7 +96,8 @@ Any other client: a Streamable HTTP MCP server at `<APP_URL>/api/mcp` with the h
 `Authorization: Bearer <token>`.
 
 Then ask the agent to run the **`implement_design`** prompt, or just: _"Read the design with
-get_project_brief and implement it step by step."_
+get_project_brief and implement it step by step."_ Then go get a coffee and check the canvas
+when you're back.
 
 | Tool                                                    | What it returns                                                 |
 | ------------------------------------------------------- | --------------------------------------------------------------- |
@@ -131,7 +170,8 @@ from the projects page.
 
 ## Security
 
-- The UI and the REST API have **no accounts**: it is a single-user tool. Compose binds every
+- The UI and the REST API have **no accounts**: it is a single-user tool. Just you and your
+  architecture, as nature intended. Compose binds every
   port to `127.0.0.1`. **Don't expose it beyond localhost without `APP_BASIC_AUTH` and TLS.**
 - MCP requests need a bearer token. Only the SHA-256 of a token is stored, the plaintext is shown
   once, and revoking a token takes effect immediately. A project-scoped token cannot see other
