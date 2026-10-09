@@ -6,11 +6,9 @@ import { GithubMark } from "@/components/landing/github-mark";
 import { Landing } from "@/components/landing/landing";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/server/auth/current";
-import { githubConfigured, safeNextPath } from "@/server/auth/github";
+import { safeNextPath } from "@/server/auth/github";
 
 const AUTH_ERRORS: Record<string, string> = {
-  not_configured:
-    "GitHub sign-in is not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET on the server.",
   not_allowed: "That GitHub account is not allowed to sign in here.",
   state: "The sign-in link expired or was tampered with. Please try again.",
   github: "GitHub didn't complete the sign-in. Please try again.",
@@ -50,12 +48,8 @@ async function Cta({ searchParams }: { searchParams: SearchParams }) {
 
 async function Notice({ searchParams }: { searchParams: SearchParams }) {
   const code = first((await searchParams).auth_error);
-  const message = code
-    ? (AUTH_ERRORS[code] ?? "Sign-in failed.")
-    : !githubConfigured()
-      ? AUTH_ERRORS.not_configured
-      : null;
-  if (!message) return null;
+  if (!code) return null;
+  const message = AUTH_ERRORS[code] ?? "Sign-in failed.";
   return (
     <p
       role="alert"

@@ -49,7 +49,7 @@ const FEATURES: { icon: LucideIcon; title: string; body: string; color: string }
   {
     icon: Database,
     title: "Yours, self-hosted",
-    body: "One Docker Compose stack on Postgres. Sign in with GitHub; each account sees only its own designs.",
+    body: "One Docker Compose stack on Postgres. Use it locally with no login, or turn on GitHub sign-in and each account gets its own designs.",
     color: "text-violet-500 bg-violet-500/10",
   },
 ];
@@ -269,7 +269,7 @@ function FinalCta({ cta }: { cta: React.ReactNode }) {
             Give your agents a blueprint
           </h2>
           <p className="max-w-md text-muted-foreground">
-            Sign in with GitHub and start from a blank canvas or the worked example.
+            Start from a blank canvas or the worked example.
           </p>
           {cta}
         </div>

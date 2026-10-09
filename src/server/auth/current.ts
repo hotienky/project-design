@@ -3,14 +3,19 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { cache } from "react";
 
-import { SESSION_COOKIE, getSessionUser, type UserRow } from "@/server/auth/sessions";
+import { isLocalMode } from "@/server/auth/github";
+import { SESSION_COOKIE, getLocalUser, getSessionUser, type UserRow } from "@/server/auth/sessions";
 import { getDb } from "@/server/db/client";
 import { env } from "@/server/env";
 import { AppError } from "@/server/errors";
 import type { Principal } from "@/server/services/tokens";
 
-/** The signed-in user for this request, or null. Read once per request. */
+/** The signed-in user for this request (the local user in local mode), or null. Read once per request. */
 export const getCurrentUser = cache(async (): Promise<UserRow | null> => {
+  if (isLocalMode()) {
+    await connection();
+    return getLocalUser(getDb());
+  }
   const token = (await cookies()).get(SESSION_COOKIE)?.value ?? "";
   // The lookup compares expiry with the clock, so it must run at request time, not in a prerender.
   await connection();

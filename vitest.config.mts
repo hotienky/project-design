@@ -24,7 +24,13 @@ export default defineConfig({
           globalSetup: ["tests/setup/global-setup.ts"],
           // Files share one database; run them one after another.
           fileParallelism: false,
-          env: { DATABASE_URL: TEST_DATABASE_URL, MIGRATE_ON_START: "false" },
+          // GitHub mode by default; local-mode tests mock isLocalMode.
+          env: {
+            DATABASE_URL: TEST_DATABASE_URL,
+            MIGRATE_ON_START: "false",
+            GITHUB_CLIENT_ID: "test-client",
+            GITHUB_CLIENT_SECRET: "test-secret",
+          },
         },
       },
     ],

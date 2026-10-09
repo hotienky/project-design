@@ -4,6 +4,9 @@ import type { GithubProfile } from "@/server/auth/sessions";
 export const OAUTH_STATE_COOKIE = "pd_oauth_state";
 export const CALLBACK_PATH = "/api/auth/github/callback";
 
+/** Without GitHub credentials the app runs in local mode: no sign-in, one built-in user. */
+export const isLocalMode = () => !githubConfigured();
+
 export function githubConfigured(): boolean {
   const { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET } = env();
   return Boolean(GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET);

@@ -48,8 +48,6 @@ test.describe("signed out", () => {
       "href",
       "/api/auth/github?next=%2Fsettings",
     );
-    // Without GitHub credentials configured, the page says so instead of failing silently.
-    await expect(page.getByText("GitHub sign-in is not configured")).toBeVisible();
 
     const api = await page.request.get(`/api/projects/${TEAM_TASKS_EXAMPLE.slug}/design`);
     expect(api.status()).toBe(401);

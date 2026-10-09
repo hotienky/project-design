@@ -8,7 +8,7 @@ const SIGNED_IN_ONLY = /^\/(projects|settings|api\/projects)(\/|$)/;
 /**
  * Optional HTTP Basic auth for the UI and REST routes (APP_BASIC_AUTH="user:pass"), then an
  * optimistic sign-in check: no session cookie on a signed-in-only path goes to the landing page
- * (or 401 for APIs). The session itself is verified on the server (src/server/auth/current.ts).
+ * (or 401 for APIs). Local mode (no GitHub credentials) has no sign-in, so it skips that check. The session itself is verified on the server (src/server/auth/current.ts).
  * /api/mcp authenticates with bearer tokens and /api/health must stay open for
  * the container healthcheck, so the matcher skips both.
  */
@@ -17,7 +17,11 @@ export function proxy(request: NextRequest) {
   if (denied) return denied;
 
   const { pathname, search } = request.nextUrl;
-  if (SIGNED_IN_ONLY.test(pathname) && !request.cookies.get(SESSION_COOKIE)?.value) {
+  if (
+    !localMode() &&
+    SIGNED_IN_ONLY.test(pathname) &&
+    !request.cookies.get(SESSION_COOKIE)?.value
+  ) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
         { error: { code: "UNAUTHORIZED", message: "Sign in to continue" } },
@@ -30,6 +34,9 @@ export function proxy(request: NextRequest) {
   }
   return NextResponse.next();
 }
+
+/** Mirrors isLocalMode in src/server/auth/github.ts: no GitHub credentials, no sign-in. */
+const localMode = () => !(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET);
 
 function checkBasicAuth(request: NextRequest): NextResponse | null {
   const expected = process.env.APP_BASIC_AUTH;

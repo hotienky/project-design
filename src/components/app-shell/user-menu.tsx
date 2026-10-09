@@ -17,6 +17,8 @@ export interface MenuUser {
   login: string;
   name: string;
   avatarUrl: string;
+  /** Local mode: there is no sign-in, so no sign-out either. */
+  local: boolean;
 }
 
 export function UserMenu({ user }: { user: MenuUser }) {
@@ -34,7 +36,9 @@ export function UserMenu({ user }: { user: MenuUser }) {
             <span className="block truncate text-sm font-medium text-foreground">
               {user.name || user.login}
             </span>
-            <span className="block truncate text-xs text-muted-foreground">@{user.login}</span>
+            <span className="block truncate text-xs text-muted-foreground">
+              {user.local ? "Local mode, no sign-in" : `@${user.login}`}
+            </span>
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -48,14 +52,18 @@ export function UserMenu({ user }: { user: MenuUser }) {
             <Settings /> Settings
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <form action="/api/auth/logout" method="post">
-          <DropdownMenuItem asChild>
-            <button type="submit" className="w-full">
-              <LogOut /> Sign out
-            </button>
-          </DropdownMenuItem>
-        </form>
+        {!user.local && (
+          <>
+            <DropdownMenuSeparator />
+            <form action="/api/auth/logout" method="post">
+              <DropdownMenuItem asChild>
+                <button type="submit" className="w-full">
+                  <LogOut /> Sign out
+                </button>
+              </DropdownMenuItem>
+            </form>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -21,6 +21,13 @@ export default defineConfig({
     url: `http://127.0.0.1:${PORT}/api/health`,
     reuseExistingServer: false,
     timeout: 60_000,
-    env: { DATABASE_URL, PORT: String(PORT), HOSTNAME: "127.0.0.1" },
+    env: {
+      DATABASE_URL,
+      PORT: String(PORT),
+      HOSTNAME: "127.0.0.1",
+      // GitHub mode, so sign-in gating is tested. Nothing here talks to GitHub.
+      GITHUB_CLIENT_ID: "e2e-client",
+      GITHUB_CLIENT_SECRET: "e2e-secret",
+    },
   },
 });
