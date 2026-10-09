@@ -4,6 +4,7 @@ import { POST as importRoute } from "@/app/api/projects/import/route";
 import { GET as getBrief } from "@/app/api/projects/[slug]/brief/route";
 import { GET as getDesign, PUT as putDesign } from "@/app/api/projects/[slug]/design/route";
 import { GET as getExport } from "@/app/api/projects/[slug]/export/route";
+import { GET as getRevision } from "@/app/api/projects/[slug]/revision/route";
 import { GET as getStatus } from "@/app/api/projects/[slug]/status/route";
 import { renderBrief } from "@/lib/design/brief";
 import { teamTasksDesign } from "@/lib/design/examples/team-tasks";
@@ -61,6 +62,21 @@ describe("REST routes", () => {
     const body = await stale.json();
     expect(body.error.code).toBe("CONFLICT");
     expect(body.error.details.currentRevision).toBe(2);
+  });
+
+  it("GET revision tracks saves and answers 404 for an unknown project", async () => {
+    await createProject(db, { name: "P" });
+    const read = async () =>
+      (await (await getRevision(new Request(url("/api/projects/p/revision")), ctx("p"))).json())
+        .revision;
+    expect(await read()).toBe(1);
+    await putDesign(
+      json("PUT", "/api/projects/p/design", { revision: 1, document: doc }),
+      ctx("p"),
+    );
+    expect(await read()).toBe(2);
+    const missing = await getRevision(new Request(url("/x")), ctx("nope"));
+    expect(missing.status).toBe(404);
   });
 
   it("PUT design answers 422 with issues and 413 for a huge body", async () => {

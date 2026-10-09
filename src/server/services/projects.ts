@@ -56,6 +56,17 @@ export async function getProject(db: Db, slug: string, principal?: Principal): P
   return row;
 }
 
+/** Just the draft revision (cheap: no document), or NOT_FOUND. Polled by open designers. */
+export async function getDraftRevision(db: Db, slug: string): Promise<number> {
+  const [row] = await db
+    .select({ revision: projects.revision })
+    .from(projects)
+    .where(eq(projects.slug, slug))
+    .limit(1);
+  if (!row) throw new AppError("NOT_FOUND", `Unknown project "${slug}"`);
+  return row.revision;
+}
+
 export async function createProject(
   db: Db,
   input: {

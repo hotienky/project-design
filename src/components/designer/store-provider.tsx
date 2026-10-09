@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useRef, useState, type RefObject } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { toast } from "sonner";
 import { useStore } from "zustand";
 import type { TemporalState } from "zundo";
@@ -56,6 +64,25 @@ export function DesignerStoreProvider({
     }),
   );
   const saveNowRef = useRef<() => Promise<void>>(async () => {});
+
+  // Read-only is a per-viewer preference, remembered per project in this browser.
+  useEffect(() => {
+    const key = `pd:readonly:${meta.slug}`;
+    try {
+      if (window.localStorage.getItem(key) === "1") store.getState().setReadOnly(true);
+    } catch {
+      // Storage unavailable (private window): start editable.
+    }
+    return store.subscribe((state, previous) => {
+      if (state.readOnly === previous.readOnly) return;
+      try {
+        if (state.readOnly) window.localStorage.setItem(key, "1");
+        else window.localStorage.removeItem(key);
+      } catch {
+        // Not remembered; the toggle still works for this visit.
+      }
+    });
+  }, [store, meta.slug]);
   return (
     <DesignerContext.Provider value={{ store, meta, saveNowRef, appUrl }}>
       <Autosave />

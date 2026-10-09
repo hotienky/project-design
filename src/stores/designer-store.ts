@@ -44,6 +44,9 @@ export interface DesignerState {
   revision: number;
   status: SaveStatus;
   statusMessage: string | null;
+  /** View-only: every edit is ignored (the document can still be replaced from the server). */
+  readOnly: boolean;
+  setReadOnly(readOnly: boolean): void;
 
   addNode(kind: NodeKind, position: Point, parentId?: string | null): string;
   updateNode(id: string, update: (node: DesignNode) => DesignNode): void;
@@ -65,7 +68,7 @@ export interface DesignerState {
   removeField(entityId: string, name: string): void;
   /** Applies a service template as one undo step; returns what was added (see edits.ts). */
   applyServiceTemplate(serviceId: string, templateId: string): TemplateApplication["added"];
-  /** Replace the draft wholesale (restore a version, reload after a conflict). */
+  /** Replace the draft wholesale (restore a version, reload after a conflict or a remote save). */
   replaceDocument(document: DesignDocument, revision?: number): void;
 
   markSaving(): void;
@@ -89,6 +92,7 @@ export function createDesignerStore(init: {
     temporal(
       (set, get) => {
         const mutate = (fn: (doc: DesignDocument) => DesignDocument) => {
+          if (get().readOnly) return;
           const next = fn(get().document);
           if (next === get().document) return;
           const check = safeParseDesign(next);
@@ -110,6 +114,11 @@ export function createDesignerStore(init: {
           revision: init.revision,
           status: "idle",
           statusMessage: null,
+          readOnly: false,
+
+          setReadOnly(readOnly) {
+            set({ readOnly });
+          },
 
           addNode(kind, position, parentId = null) {
             const meta = NODE_KIND_META[kind];
@@ -147,6 +156,7 @@ export function createDesignerStore(init: {
           },
 
           connect(source, target, kind) {
+            if (get().readOnly) return null;
             const doc = get().document;
             const s = doc.nodes.find((n) => n.id === source);
             const t = doc.nodes.find((n) => n.id === target);

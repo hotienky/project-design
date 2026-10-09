@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import { useCanvasActions } from "@/components/designer/canvas-actions";
-import { useTemporal } from "@/components/designer/store-provider";
+import { useDesigner, useTemporal } from "@/components/designer/store-provider";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCanvasUi } from "@/stores/canvas-ui-store";
@@ -50,8 +50,9 @@ function Tool({
 }
 
 export function Toolbar() {
-  const canUndo = useTemporal((t) => t.pastStates.length > 0);
-  const canRedo = useTemporal((t) => t.futureStates.length > 0);
+  const readOnly = useDesigner((s) => s.readOnly);
+  const canUndo = useTemporal((t) => t.pastStates.length > 0) && !readOnly;
+  const canRedo = useTemporal((t) => t.futureStates.length > 0) && !readOnly;
   const undo = useTemporal((t) => t.undo);
   const redo = useTemporal((t) => t.redo);
   const actions = useCanvasActions();

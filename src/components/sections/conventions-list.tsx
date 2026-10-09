@@ -91,6 +91,7 @@ export function ConventionsList() {
 
   return (
     <SectionPage
+      editable
       title="Conventions"
       description="Rules the generated code follows. MUST conventions are hard constraints for agents."
       actions={

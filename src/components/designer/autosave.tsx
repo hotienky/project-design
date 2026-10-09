@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { toast } from "sonner";
 
 import { createAutosaver, type SaveOutcome } from "@/components/designer/autosaver";
 import { useDesignerStore, useSaveNowRef } from "@/components/designer/store-provider";
@@ -13,17 +14,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type { DesignDocument } from "@/lib/design/schema";
 import { useCanvasUi } from "@/stores/canvas-ui-store";
 import { isDirty } from "@/stores/designer-store";
 
 const DEBOUNCE_MS = 800;
 const RETRY_MS = [2000, 4000, 8000, 16000, 30000];
+/** How often an open designer checks for saves made elsewhere (agents over MCP, other tabs). */
+const REMOTE_POLL_MS = 3000;
 
 const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
   (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable);
 
-/** Saves the draft in the background (see CURRENT_PLAN §12), resolves conflicts, and owns the keyboard shortcuts. */
+/**
+ * Saves the draft in the background (see CURRENT_PLAN §12), picks up saves made elsewhere,
+ * resolves conflicts, and owns the keyboard shortcuts.
+ */
 export function Autosave() {
   const store = useDesignerStore();
   const saveNowRef = useSaveNowRef();
@@ -94,7 +101,7 @@ export function Autosave() {
         void saver.saveNow();
         return;
       }
-      if (isTyping(event.target)) return;
+      if (isTyping(event.target) || store.getState().readOnly) return;
       const history = store.temporal.getState();
       if (key === "z" && !event.shiftKey) history.undo();
       else if ((key === "z" && event.shiftKey) || key === "y") history.redo();
@@ -114,6 +121,50 @@ export function Autosave() {
       window.removeEventListener("beforeunload", onBeforeUnload);
     };
   }, [store, saveNowRef]);
+
+  // Remote → store: while nothing local is pending, load newer revisions (an agent's edits
+  // appear on the canvas). With unsaved edits, the next save meets the conflict dialog instead.
+  useEffect(() => {
+    const slug = store.getState().slug;
+    let stopped = false;
+    let busy = false;
+    const settled = () => {
+      const state = store.getState();
+      return !stopped && state.status === "idle" && !isDirty(state);
+    };
+
+    async function check() {
+      if (busy || !settled() || document.visibilityState !== "visible") return;
+      busy = true;
+      try {
+        const head = await fetch(`/api/projects/${slug}/revision`, { cache: "no-store" });
+        if (!head.ok) return;
+        const { revision } = (await head.json()) as { revision: number };
+        if (revision <= store.getState().revision || !settled()) return;
+        const response = await fetch(`/api/projects/${slug}/design`, { cache: "no-store" });
+        if (!response.ok) return;
+        const current = (await response.json()) as { revision: number; document: DesignDocument };
+        // An edit or a save started meanwhile: leave it to autosave.
+        if (!settled() || current.revision <= store.getState().revision) return;
+        store.getState().replaceDocument(current.document, current.revision);
+        store.temporal.getState().clear();
+        toast.info("Design updated elsewhere", { id: "remote-update" });
+      } catch {
+        // Offline or the server restarted: try again on the next tick.
+      } finally {
+        busy = false;
+      }
+    }
+
+    const timer = setInterval(() => void check(), REMOTE_POLL_MS);
+    const onVisible = () => void check();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [store]);
 
   async function fetchCurrent() {
     const response = await fetch(`/api/projects/${store.getState().slug}/design`);

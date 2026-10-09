@@ -127,6 +127,7 @@ export function DecisionsList() {
 
   return (
     <SectionPage
+      editable
       title="Decisions"
       description="Architecture decisions and why they were made, so agents don't undo them."
       actions={

@@ -21,6 +21,7 @@ import {
   type NodeSelectionChange,
   type Viewport,
 } from "@xyflow/react";
+import { Lock } from "lucide-react";
 import { useTheme } from "next-themes";
 import {
   useCallback,
@@ -134,6 +135,7 @@ function Flow({ wide }: { wide: boolean }) {
   const minimapOpen = useCanvasUi((s) => s.minimapOpen);
   const validationOpen = useCanvasUi((s) => s.validationOpen);
   const document = useDesigner((s) => s.document);
+  const readOnly = useDesigner((s) => s.readOnly);
   const viewMode = useCanvasUi((s) => s.viewMode);
   const focusId = useCanvasUi((s) => s.focusId);
   const view = useMemo(
@@ -497,11 +499,11 @@ function Flow({ wide }: { wide: boolean }) {
   const onDrop = useCallback(
     (event: DragEvent) => {
       const kind = event.dataTransfer.getData(DRAG_MIME) as NodeKind;
-      if (!NODE_KINDS.includes(kind)) return;
+      if (!NODE_KINDS.includes(kind) || store.getState().readOnly) return;
       event.preventDefault();
       addNodeAt(kind, toAbsolute(rf.screenToFlowPosition({ x: event.clientX, y: event.clientY })));
     },
-    [rf, addNodeAt, toAbsolute],
+    [rf, store, addNodeAt, toAbsolute],
   );
 
   // ── Actions exposed to the palette, inspector and validation panel ────────
@@ -579,7 +581,7 @@ function Flow({ wide }: { wide: boolean }) {
   return (
     <CanvasActionsProvider actionsRef={actions}>
       <div className="flex min-h-0 min-w-0 flex-1">
-        <Palette />
+        {!readOnly && <Palette />}
         <div
           ref={wrapper}
           className="relative min-w-0 flex-1"
@@ -626,7 +628,9 @@ function Flow({ wide }: { wide: boolean }) {
             connectionRadius={40}
             snapToGrid
             snapGrid={SNAP}
-            deleteKeyCode={["Backspace", "Delete"]}
+            nodesDraggable={!readOnly}
+            nodesConnectable={!readOnly}
+            deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
             multiSelectionKeyCode="Shift"
             defaultViewport={(!view && savedViewport) || undefined}
             fitView={!!view || !savedViewport}
@@ -655,6 +659,12 @@ function Flow({ wide }: { wide: boolean }) {
             <Controls position="top-right" showInteractive={false} />
             <Panel position="top-left" className="flex items-center gap-2">
               <Toolbar />
+              {readOnly && (
+                <span className="flex h-8 items-center gap-1.5 rounded-lg border bg-background px-2.5 text-xs font-medium text-muted-foreground shadow-xs">
+                  <Lock className="size-3.5" aria-hidden />
+                  Read-only
+                </span>
+              )}
               {view && <LevelBreadcrumb focusId={view.focus?.id ?? null} />}
             </Panel>
             {view?.focus?.kind === "module" && (

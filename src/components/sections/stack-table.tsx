@@ -105,6 +105,7 @@ export function StackTable() {
 
   return (
     <SectionPage
+      editable
       wide
       title="Tech stack"
       description="The languages, frameworks and tools the design commits to. A scoped choice replaces the project-wide one for those components."

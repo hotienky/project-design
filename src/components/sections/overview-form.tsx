@@ -24,6 +24,7 @@ export function OverviewForm() {
 
   return (
     <SectionPage
+      editable
       title="Overview"
       description="What you are building and how it is organised. Agents read this first."
     >

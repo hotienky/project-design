@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 import { KIND_STYLE, NOTE_COLORS, STATUS_STYLE } from "@/components/designer/nodes/kind-style";
-import { useDesignerStore } from "@/components/designer/store-provider";
+import { useDesigner, useDesignerStore } from "@/components/designer/store-provider";
 import type { FlowNode } from "@/components/designer/to-flow";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -39,6 +39,8 @@ const SIDES = [
  * connection, and the direction is always drag-start → drop target.
  */
 function Handles({ kind }: { kind: DesignNode["kind"] }) {
+  // Edges still need the handles to attach to; read-only just never reveals them.
+  const readOnly = useDesigner((s) => s.readOnly);
   return SIDES.map(([id, position]) => (
     <Handle
       key={id}
@@ -46,7 +48,10 @@ function Handles({ kind }: { kind: DesignNode["kind"] }) {
       type="source"
       position={position}
       style={{ background: KIND_STYLE[kind].hex }}
-      className="size-2.5! border-2! border-background! opacity-0 transition-opacity group-hover/node:opacity-100 group-data-[selected=true]/node:opacity-100"
+      className={cn(
+        "size-2.5! border-2! border-background! opacity-0 transition-opacity",
+        !readOnly && "group-hover/node:opacity-100 group-data-[selected=true]/node:opacity-100",
+      )}
     />
   ));
 }
@@ -316,6 +321,7 @@ export function NoteNode({ data, selected }: NodeProps<FlowNode>) {
 export function ContainerNode({ id, data, selected }: NodeProps<FlowNode>) {
   const store = useDesignerStore();
   const levels = useCanvasUi((s) => s.viewMode === "levels");
+  const readOnly = useDesigner((s) => s.readOnly);
   const style = KIND_STYLE[data.node.kind];
   return (
     <div
@@ -328,7 +334,7 @@ export function ContainerNode({ id, data, selected }: NodeProps<FlowNode>) {
       )}
     >
       <NodeResizer
-        isVisible={selected}
+        isVisible={selected && !readOnly}
         minWidth={160}
         minHeight={80}
         onResizeEnd={(_, p) =>

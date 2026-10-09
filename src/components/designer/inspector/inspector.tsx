@@ -13,7 +13,17 @@ import { NODE_KIND_META } from "@/lib/design/catalog";
 import { NODE_KINDS } from "@/lib/design/schema";
 import { useSelection } from "@/stores/selection-store";
 
+/** Read-only greys out every control at once (a disabled fieldset disables all of them). */
 function Content() {
+  const readOnly = useDesigner((s) => s.readOnly);
+  return (
+    <fieldset disabled={readOnly} className="contents">
+      <Editor />
+    </fieldset>
+  );
+}
+
+function Editor() {
   const nodeIds = useSelection((s) => s.nodeIds);
   const edgeIds = useSelection((s) => s.edgeIds);
   const document = useDesigner((s) => s.document);

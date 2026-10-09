@@ -146,6 +146,9 @@ test("refuses to drop a layer on empty canvas", async ({ page }) => {
 });
 
 test("a second tab saving first shows the conflict dialog", async ({ page, context }) => {
+  // Keep this tab from picking up the other tab's save on its own: the race under test is
+  // an edit made here before this tab has seen the newer revision.
+  await page.route("**/api/projects/*/revision", (route) => route.abort());
   await open(page);
   await drop(page, "Service", { x: 330, y: 260 });
   await rename(page, "First");
@@ -166,6 +169,41 @@ test("a second tab saving first shows the conflict dialog", async ({ page, conte
   await expect(dialog).toBeHidden();
   await expect(page.locator(".react-flow__node").filter({ hasText: "Second" })).toHaveCount(1);
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+});
+
+test("read-only blocks edits, and saves made elsewhere appear on the canvas", async ({ page }) => {
+  await open(page);
+  await drop(page, "Service", { x: 330, y: 260 });
+  await rename(page, "First");
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+
+  const toggle = page.getByRole("button", { name: "Read-only" });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Add Service" })).toBeHidden();
+  await expect(page.getByLabel("Name", { exact: true })).toBeDisabled();
+  await page.keyboard.press("Delete");
+  await expect(page.locator(".react-flow__node")).toHaveCount(1);
+
+  // An agent (here: a plain PUT) saves a new revision; the open canvas follows it.
+  const { revision, document } = await getDoc(page);
+  const renamed = { ...document, nodes: document.nodes.map((n) => ({ ...n, name: "By agent" })) };
+  const put = await page.request.put(`/api/projects/${SLUG}/design`, {
+    data: { revision, document: renamed },
+  });
+  expect(put.ok()).toBe(true);
+  await expect(page.locator(".react-flow__node").filter({ hasText: "By agent" })).toHaveCount(1);
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("By agent");
+
+  // The choice is remembered for this project in this browser.
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Read-only" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Read-only" }).click();
+  await expect(page.getByRole("button", { name: "Add Service" })).toBeVisible();
+  expect((await getDoc(page)).revision).toBe(revision + 1);
 });
 
 test("opens a 300-node design without console errors", async ({ page }) => {

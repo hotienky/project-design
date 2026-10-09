@@ -62,6 +62,26 @@ describe("designer store", () => {
     expect(isDirty(store.getState())).toBe(true); // a newer edit is still pending
   });
 
+  it("ignores every edit while read-only but still takes server documents", () => {
+    const store = make();
+    const original = store.getState().document;
+    store.getState().setReadOnly(true);
+    store.getState().addNode("module", { x: 10, y: 10 }, "lyr_app");
+    store.getState().updateNode("svc_web", (n) => ({ ...n, name: "Website" }));
+    expect(store.getState().connect("ent_user", "ent_project")).toBeNull();
+    store.getState().removeElements({ nodeIds: ["svc_api"] });
+    expect(store.getState().document).toBe(original);
+    expect(isDirty(store.getState())).toBe(false);
+    expect(store.temporal.getState().pastStates).toHaveLength(0);
+
+    const remote = { ...original };
+    store.getState().replaceDocument(remote, 5);
+    expect(store.getState()).toMatchObject({ document: remote, revision: 5 });
+    store.getState().setReadOnly(false);
+    store.getState().updateNode("svc_web", (n) => ({ ...n, name: "Website" }));
+    expect(isDirty(store.getState())).toBe(true);
+  });
+
   it("discards an edit that would make the document invalid and reports why", () => {
     const rejected: string[] = [];
     const store = createDesignerStore({

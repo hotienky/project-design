@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CircleAlert, Network, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CircleAlert, Lock, LockOpen, Network, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -10,7 +10,11 @@ import { renameProjectAction } from "@/app/actions/projects";
 import { ConnectDialog, ExportMenu } from "@/components/designer/header-menus";
 import { PublishDialog } from "@/components/designer/publish-dialog";
 import { SaveIndicator } from "@/components/designer/save-indicator";
-import { useDesigner, useProjectMeta } from "@/components/designer/store-provider";
+import {
+  useDesigner,
+  useDesignerStore,
+  useProjectMeta,
+} from "@/components/designer/store-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { validateDesign } from "@/lib/design/validate";
@@ -117,6 +121,24 @@ function ValidateButton() {
   );
 }
 
+/** Locks the design against edits here; agents and other tabs can still change it. */
+function ReadOnlyToggle() {
+  const store = useDesignerStore();
+  const readOnly = useDesigner((s) => s.readOnly);
+  return (
+    <Button
+      variant={readOnly ? "secondary" : "outline"}
+      size="sm"
+      aria-pressed={readOnly}
+      title={readOnly ? "Allow editing" : "View only: block edits in this browser"}
+      onClick={() => store.getState().setReadOnly(!readOnly)}
+    >
+      {readOnly ? <Lock /> : <LockOpen />}
+      Read-only
+    </Button>
+  );
+}
+
 export function ProjectHeader() {
   const { slug, description } = useProjectMeta();
   const pathname = usePathname();
@@ -141,6 +163,7 @@ export function ProjectHeader() {
             <ExportMenu />
             <ConnectDialog />
           </div>
+          <ReadOnlyToggle />
           <PublishDialog />
         </div>
       </div>
