@@ -53,17 +53,37 @@ designed, not what they hallucinated, and they tick off each box on the canvas a
 - **MCP server** at `/api/mcp`: 23 tools, 3 prompts, 3 resources. Agents get the brief, the raw
   JSON, per-component context, an OpenAPI 3.1 contract, the data model (JSON or Mermaid), a
   dependency-ordered build plan and the changes between versions — and can edit the design too.
-- **Self-hosted**: Next.js 16, PostgreSQL 18, one Docker Compose file. Your architecture stays
-  on your machine, where it can't embarrass you in public.
+- **Cloud or self-hosted**: use the hosted version at
+  [pd.polarizelab.com](https://pd.polarizelab.com), or run it yourself with Next.js 16,
+  PostgreSQL 18 and one Docker Compose file — then your architecture stays on your machine,
+  where it can't embarrass you in public.
 
-## Quick start (Docker)
+## Two ways to run it
+
+|                  | Cloud                                                    | Local                                   |
+| ---------------- | -------------------------------------------------------- | --------------------------------------- |
+| URL              | <https://pd.polarizelab.com>                             | <http://localhost:3000>                 |
+| Setup            | None                                                     | Docker                                  |
+| Login            | GitHub sign-in; your projects are private to your account | None (local mode, one built-in user)   |
+| MCP endpoint     | `https://pd.polarizelab.com/api/mcp`                     | `http://localhost:3000/api/mcp`         |
+| Your data lives  | On the hosted server                                     | In a Docker volume on your machine      |
+
+### Cloud
+
+1. Open <https://pd.polarizelab.com> and **sign in with GitHub**.
+2. Create a project (try **Example: Team Tasks**).
+3. Create a token under **Settings → MCP tokens** and [connect an agent](#connect-an-agent)
+   using `https://pd.polarizelab.com/api/mcp`.
+
+### Local (Docker)
 
 ```bash
 docker compose up -d --build --wait
 open http://localhost:3000        # or xdg-open on Linux
 ```
 
-Create a project (try **Example: Team Tasks**), then connect an agent (below). Out of the box
+Create a project (try **Example: Team Tasks**), then [connect an agent](#connect-an-agent)
+using `http://localhost:3000/api/mcp`. Out of the box
 the app runs in **local mode**: no login, one built-in user. To give each person their own
 designs, turn on GitHub sign-in: create a GitHub OAuth app (**GitHub → Settings → Developer
 settings → OAuth Apps**) with the callback URL `<APP_URL>/api/auth/github/callback` and pass its
@@ -77,10 +97,16 @@ The app and the database bind to `127.0.0.1` only. Change the ports with `APP_PO
 ## Connect an agent
 
 Create a token under **Settings → MCP tokens**. A token can be scoped to one project, which lets
-the agent leave out the `project` argument — create one per generated repository.
+the agent leave out the `project` argument — create one per generated repository. The examples
+use the cloud URL; for a local install use `http://localhost:3000/api/mcp` instead (the
+**Settings** page shows the right snippet for the instance you're on).
 
 ```bash
-# Claude Code
+# Claude Code — cloud
+claude mcp add --transport http project-design https://pd.polarizelab.com/api/mcp \
+  --header "Authorization: Bearer pd_…"
+
+# Claude Code — local
 claude mcp add --transport http project-design http://localhost:3000/api/mcp \
   --header "Authorization: Bearer pd_…"
 ```
@@ -91,14 +117,15 @@ claude mcp add --transport http project-design http://localhost:3000/api/mcp \
   "mcpServers": {
     "project-design": {
       "type": "http",
-      "url": "http://localhost:3000/api/mcp",
+      "url": "https://pd.polarizelab.com/api/mcp", // or http://localhost:3000/api/mcp
       "headers": { "Authorization": "Bearer ${PROJECT_DESIGN_TOKEN}" }
     }
   }
 }
 ```
 
-Any other client: a Streamable HTTP MCP server at `<APP_URL>/api/mcp` with the header
+Any other client: a Streamable HTTP MCP server at `<APP_URL>/api/mcp` (cloud:
+`https://pd.polarizelab.com/api/mcp`) with the header
 `Authorization: Bearer <token>`.
 
 Then ask the agent to run the **`implement_design`** prompt, or just: _"Read the design with
