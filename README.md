@@ -31,6 +31,8 @@ designed, not what they hallucinated, and they tick off each box on the canvas a
    scares you). Drop services, nest layers and modules inside them, add datastores with
    entities, APIs with operations, queues with channels, integrations and actors. Connect them
    with typed edges — `calls`, `depends_on`, `publishes`, `subscribes` and friends.
+   Already have the code? Connect an agent and let it
+   [describe the existing project](#describe-an-existing-project) for you.
 2. **Write down the boring-but-important stuff.** Tech stack, conventions, architecture
    decisions (ADRs) and a markdown brief. The things everyone "just knows" until they quit.
 3. **Check it.** The validation panel yells about unused components, layer violations and
@@ -101,36 +103,177 @@ the agent leave out the `project` argument — create one per generated reposito
 use the cloud URL; for a local install use `http://localhost:3000/api/mcp` instead (the
 **Settings** page shows the right snippet for the instance you're on).
 
-```bash
-# Claude Code — cloud
-claude mcp add --transport http project-design https://pd.polarizelab.com/api/mcp \
-  --header "Authorization: Bearer pd_…"
+Most config files below read the token from an environment variable, so it never lands in a
+committed file. Export it in the shell (or profile) your agent starts from:
 
-# Claude Code — local
-claude mcp add --transport http project-design http://localhost:3000/api/mcp \
+```bash
+export PROJECT_DESIGN_TOKEN=pd_…
+```
+
+### Claude Code
+
+```bash
+claude mcp add --transport http project-design https://pd.polarizelab.com/api/mcp \
   --header "Authorization: Bearer pd_…"
 ```
 
-```jsonc
-// .mcp.json in the generated repo (keep the token in an environment variable)
+Or commit a `.mcp.json` at the repository root:
+
+```json
 {
   "mcpServers": {
     "project-design": {
       "type": "http",
-      "url": "https://pd.polarizelab.com/api/mcp", // or http://localhost:3000/api/mcp
+      "url": "https://pd.polarizelab.com/api/mcp",
       "headers": { "Authorization": "Bearer ${PROJECT_DESIGN_TOKEN}" }
     }
   }
 }
 ```
 
-Any other client: a Streamable HTTP MCP server at `<APP_URL>/api/mcp` (cloud:
-`https://pd.polarizelab.com/api/mcp`) with the header
-`Authorization: Bearer <token>`.
+### Codex (CLI and IDE extension)
 
-Then ask the agent to run the **`implement_design`** prompt, or just: _"Read the design with
+```bash
+codex mcp add project-design --url https://pd.polarizelab.com/api/mcp \
+  --bearer-token-env-var PROJECT_DESIGN_TOKEN
+```
+
+Or add it to `~/.codex/config.toml` by hand:
+
+```toml
+[mcp_servers.project-design]
+url = "https://pd.polarizelab.com/api/mcp"
+bearer_token_env_var = "PROJECT_DESIGN_TOKEN"
+```
+
+### Cursor
+
+`.cursor/mcp.json` in the repository (or `~/.cursor/mcp.json` for every project):
+
+```json
+{
+  "mcpServers": {
+    "project-design": {
+      "url": "https://pd.polarizelab.com/api/mcp",
+      "headers": { "Authorization": "Bearer ${env:PROJECT_DESIGN_TOKEN}" }
+    }
+  }
+}
+```
+
+### Windsurf
+
+`~/.codeium/windsurf/mcp_config.json` (Cascade → MCP servers → Configure), then press
+**Refresh**:
+
+```json
+{
+  "mcpServers": {
+    "project-design": {
+      "serverUrl": "https://pd.polarizelab.com/api/mcp",
+      "headers": { "Authorization": "Bearer ${env:PROJECT_DESIGN_TOKEN}" }
+    }
+  }
+}
+```
+
+### VS Code (GitHub Copilot agent mode)
+
+`.vscode/mcp.json` in the repository. VS Code asks for the token once and stores it securely:
+
+```json
+{
+  "servers": {
+    "project-design": {
+      "type": "http",
+      "url": "https://pd.polarizelab.com/api/mcp",
+      "headers": { "Authorization": "Bearer ${input:project-design-token}" }
+    }
+  },
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "project-design-token",
+      "description": "Project Design MCP token",
+      "password": true
+    }
+  ]
+}
+```
+
+### Gemini CLI
+
+`~/.gemini/settings.json` (or `.gemini/settings.json` in the repository):
+
+```json
+{
+  "mcpServers": {
+    "project-design": {
+      "httpUrl": "https://pd.polarizelab.com/api/mcp",
+      "headers": { "Authorization": "Bearer $PROJECT_DESIGN_TOKEN" }
+    }
+  }
+}
+```
+
+### Anything else
+
+Any client that speaks remote MCP: a **Streamable HTTP** server at `<APP_URL>/api/mcp` with
+the header `Authorization: Bearer <token>`. Clients that only run local (stdio) servers, such as
+Claude Desktop, can use the [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) bridge:
+
+```json
+{
+  "mcpServers": {
+    "project-design": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://pd.polarizelab.com/api/mcp", "--header", "Authorization:${AUTH_HEADER}"],
+      "env": { "AUTH_HEADER": "Bearer pd_…" }
+    }
+  }
+}
+```
+
+Check the connection with the client's MCP list (`/mcp` in Claude Code and Codex, the MCP
+settings page in Cursor, Windsurf and VS Code): `project-design` should show its tools.
+
+## Use it from your agent
+
+### Describe an existing project
+
+Already have a codebase and no design? Let the agent draw it for you:
+
+1. Create an empty project in the app (**New project → Blank**).
+2. Create a token scoped to that project and connect the agent from the repository's folder.
+3. Ask the agent:
+
+   > Describe this repository in the project-design MCP server.
+   > 1. Call get_design_schema, then list_projects to find the (empty) project to fill.
+   > 2. Explore the code. Add what really exists with add_component and connect_components:
+   >    services and apps, the layers and modules inside them, datastores with their entities,
+   >    APIs with their operations, queues and channels, third-party integrations and actors.
+   > 3. Fill in the overview with update_overview, and the tech stack (versions from the
+   >    lockfiles), conventions and notable architecture decisions with upsert_section_items.
+   > 4. Only add what you can point to in the code. Mark each component that is already
+   >    implemented as done with set_component_status.
+   > 5. Finish with validate_design and summarise what you mapped and what you were unsure about.
+
+   The same prompt is on the **Settings** page with a copy button.
+
+4. Open the canvas. Every edit is saved to the draft at once, so you can watch it fill up,
+   then tidy the layout, fix what the agent got wrong and **publish** a first version.
+
+From then on the design is the map of the project: the next developer (or agent) reads the brief
+instead of 40 folders.
+
+### Build from a design
+
+Ask the agent to run the **`implement_design`** prompt, or just: _"Read the design with
 get_project_brief and implement it step by step."_ Then go get a coffee and check the canvas
-when you're back.
+when you're back. When the design changes later, `sync_design_changes` updates the code from
+the diff, and `review_against_design` lists where the code has drifted.
+
+### Tools, prompts and resources
 
 | Tool                                                    | What it returns                                                 |
 | ------------------------------------------------------- | --------------------------------------------------------------- |
