@@ -6,7 +6,6 @@ import {
   Background,
   BackgroundVariant,
   ConnectionMode,
-  Controls,
   MiniMap,
   Panel,
   ReactFlow,

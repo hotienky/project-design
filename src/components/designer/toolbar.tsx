@@ -187,11 +187,7 @@ export function Toolbar() {
       {/* Tools & Panels */}
       <div className="flex items-center divide-x divide-border/50">
         <Tool
-          label={
-            hasErrors
-              ? `Validation: ${issues.length} errors/warnings`
-              : "Validation panel"
-          }
+          label={hasErrors ? `Validation: ${issues.length} errors/warnings` : "Validation panel"}
           pressed={validationOpen}
           badge={
             hasErrors ? (

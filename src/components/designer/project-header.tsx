@@ -202,7 +202,10 @@ export function ProjectHeader() {
       </div>
 
       {/* Sub-nav row for mobile/smaller screens (< lg) */}
-      <nav aria-label="Mobile project sections" className="flex h-9 items-center border-t px-4 lg:hidden">
+      <nav
+        aria-label="Mobile project sections"
+        className="flex h-9 items-center border-t px-4 lg:hidden"
+      >
         <div className="inline-flex items-center gap-0.5 rounded-lg bg-muted/60 p-0.5">
           {TABS.map((tab) => {
             const href = tab.segment ? `/projects/${slug}/${tab.segment}` : `/projects/${slug}`;

@@ -22,7 +22,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { canContain, NODE_KIND_META } from "@/lib/design/catalog";
 import { NODE_KINDS, type DesignNode, type NodeKind } from "@/lib/design/schema";
 import { cn } from "@/lib/utils";
-import { useCanvasUi, type LeftSidebarTab, type PaletteLayout } from "@/stores/canvas-ui-store";
+import { useCanvasUi, type PaletteLayout } from "@/stores/canvas-ui-store";
 import { useSelection } from "@/stores/selection-store";
 
 export const DRAG_MIME = "application/x-design-kind";
@@ -148,9 +148,7 @@ function PaletteButton({
             </span>
           )}
         </div>
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          {meta.description}
-        </p>
+        <p className="text-xs text-muted-foreground leading-relaxed">{meta.description}</p>
         {disabled ? (
           <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
             Requires parent: {meta.parents.filter(Boolean).join(" or ")}
@@ -294,7 +292,10 @@ function ExplorerContent() {
       {/* Search Bar */}
       <div className="border-b p-2.5">
         <div className="relative">
-          <Search className="absolute top-2.5 left-2.5 size-3.5 text-muted-foreground" aria-hidden />
+          <Search
+            className="absolute top-2.5 left-2.5 size-3.5 text-muted-foreground"
+            aria-hidden
+          />
           <Input
             value={searchQuery}
             placeholder={`Search ${document.nodes.length} components…`}
@@ -460,9 +461,7 @@ export function Palette() {
                 <FolderTree className="size-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="right">
-              Project explorer ({document.nodes.length})
-            </TooltipContent>
+            <TooltipContent side="right">Project explorer ({document.nodes.length})</TooltipContent>
           </Tooltip>
         </div>
       </aside>
