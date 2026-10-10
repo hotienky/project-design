@@ -11,7 +11,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import { useCanvasActions } from "@/components/designer/canvas-actions";
 import { KIND_STYLE } from "@/components/designer/nodes/kind-style";
@@ -22,7 +22,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { canContain, NODE_KIND_META } from "@/lib/design/catalog";
 import { NODE_KINDS, type DesignNode, type NodeKind } from "@/lib/design/schema";
 import { cn } from "@/lib/utils";
-import { useCanvasUi, type PaletteLayout } from "@/stores/canvas-ui-store";
+import { useCanvasUi, PALETTE_LAYOUT_KEY, type PaletteLayout } from "@/stores/canvas-ui-store";
 import { useSelection } from "@/stores/selection-store";
 
 export const DRAG_MIME = "application/x-design-kind";
@@ -410,7 +410,20 @@ export function Palette() {
   const activeTab = useCanvasUi((s) => s.leftSidebarTab);
   const toggleOpen = useCanvasUi((s) => s.toggleLeftSidebar);
   const setTab = useCanvasUi((s) => s.setLeftSidebarTab);
+  const setPaletteLayout = useCanvasUi((s) => s.setPaletteLayout);
   const document = useDesigner((s) => s.document);
+
+  // Restore saved palette layout preference from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(PALETTE_LAYOUT_KEY);
+      if (saved === "grid" || saved === "list") {
+        setPaletteLayout(saved);
+      }
+    } catch {
+      // Storage unavailable
+    }
+  }, [setPaletteLayout]);
 
   if (!isOpen) {
     return (

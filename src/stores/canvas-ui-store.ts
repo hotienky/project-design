@@ -46,6 +46,17 @@ interface CanvasUiState {
   setActiveFilterKind(kind: NodeKind | "all"): void;
 }
 
+export const PALETTE_LAYOUT_KEY = "pd:palette-layout";
+
+function persistPaletteLayout(layout: PaletteLayout): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PALETTE_LAYOUT_KEY, layout);
+  } catch {
+    // Storage unavailable
+  }
+}
+
 /** View toggles shared by the project header and the canvas toolbar. */
 export const useCanvasUi = create<CanvasUiState>((set) => ({
   perspective: "architecture",
@@ -70,7 +81,10 @@ export const useCanvasUi = create<CanvasUiState>((set) => ({
   toggleLeftSidebar: () => set((s) => ({ leftSidebarOpen: !s.leftSidebarOpen })),
   setLeftSidebarOpen: (leftSidebarOpen) => set({ leftSidebarOpen }),
   setLeftSidebarTab: (leftSidebarTab) => set({ leftSidebarTab, leftSidebarOpen: true }),
-  setPaletteLayout: (paletteLayout) => set({ paletteLayout }),
+  setPaletteLayout: (paletteLayout) => {
+    persistPaletteLayout(paletteLayout);
+    set({ paletteLayout });
+  },
   toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
   setRightSidebarOpen: (rightSidebarOpen) => set({ rightSidebarOpen }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
