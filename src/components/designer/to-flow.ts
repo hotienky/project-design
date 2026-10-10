@@ -4,6 +4,7 @@ import type { Edge, Node } from "@xyflow/react";
 import { EDGE_KIND_META, NODE_KIND_META } from "@/lib/design/catalog";
 import { nodeSize } from "@/lib/design/geometry";
 import type { LevelView } from "@/lib/design/levels";
+import { designIdOf, type PerspectiveView } from "@/lib/design/perspectives";
 import type { DesignDocument, DesignEdge, DesignNode } from "@/lib/design/schema";
 import type { ComponentStatus } from "@/lib/design/status";
 
@@ -14,6 +15,8 @@ export type FlowNodeData = {
   collapsed?: number;
   /** Levels view: a read-only node outside the focus, with its path. */
   context?: string;
+  /** API / Layers perspective: where a card lives, or a band's or frame's own caption. */
+  label?: string;
 };
 export type FlowNode = Node<FlowNodeData>;
 export type FlowEdgeData = {
@@ -21,6 +24,8 @@ export type FlowEdgeData = {
   caption: string;
   /** Levels view: how many design edges this derived edge stands for (absent for real edges). */
   lifted?: number;
+  /** Layers perspective: the dependency breaks the layer rules. */
+  violation?: boolean;
 };
 export type FlowEdge = Edge<FlowEdgeData>;
 
@@ -110,6 +115,42 @@ function levelNodes(
   return [...inside, ...context];
 }
 
+const PERSPECTIVE_TYPE = {
+  card: "perspectiveCard",
+  api: "apiOperations",
+  frame: "serviceFrame",
+  band: "layerBand",
+} as const;
+
+/** API / Layers perspective nodes: laid out for you, so nothing drags, connects or deletes. */
+export function perspectiveNodes(
+  view: PerspectiveView,
+  statuses: Record<string, { status: ComponentStatus; note: string }>,
+  selected: ReadonlySet<string>,
+): FlowNode[] {
+  return view.nodes.map((p): FlowNode => {
+    const isSelected = selected.has(designIdOf(p.id));
+    return {
+      id: p.id,
+      type: PERSPECTIVE_TYPE[p.role],
+      position: p.position,
+      ...(p.parentId ? { parentId: p.parentId } : {}),
+      data: {
+        node: p.node,
+        status: statuses[p.node.id] ?? null,
+        ...(p.label !== undefined ? { label: p.label } : {}),
+        ...(p.count !== undefined ? { collapsed: p.count } : {}),
+      },
+      ...(p.size ? { width: p.size.width, height: p.size.height } : {}),
+      selected: isSelected,
+      draggable: false,
+      deletable: false,
+      connectable: false,
+      zIndex: p.role === "frame" ? 0 : p.role === "band" ? 1 : cardZ(isSelected),
+    };
+  });
+}
+
 const CARDINALITY = { "one-to-one": "1—1", "one-to-many": "1—N", "many-to-many": "N—N" } as const;
 
 /** The pill text shown on an edge: its kind plus the detail that matters for that kind. */
@@ -167,6 +208,34 @@ export function toFlowEdges(
     data: { edge: e, caption: edgeCaption(e, nodes) },
     animated: e.kind === "publishes" || e.kind === "subscribes",
     selected: selected.has(e.id),
+    zIndex: Z.edge,
+  }));
+}
+
+export function perspectiveEdges(
+  doc: DesignDocument,
+  view: PerspectiveView,
+  selected: ReadonlySet<string>,
+): FlowEdge[] {
+  const nodes = new Map(doc.nodes.map((n) => [n.id, n]));
+  return view.edges.map((e) => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    type: "design",
+    data: {
+      edge: e.edge,
+      caption: e.violation
+        ? "breaks layers"
+        : e.lifted
+          ? EDGE_KIND_META[e.kind].label
+          : edgeCaption(e.edge, nodes),
+      ...(e.lifted ? { lifted: e.lifted } : {}),
+      ...(e.violation ? { violation: true } : {}),
+    },
+    selected: !e.lifted && selected.has(e.id),
+    deletable: false,
+    ...(e.lifted ? { selectable: false } : {}),
     zIndex: Z.edge,
   }));
 }

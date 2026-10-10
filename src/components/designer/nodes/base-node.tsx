@@ -38,7 +38,7 @@ const SIDES = [
  * All handles are "source" handles: with ConnectionMode.Loose any handle can start or end a
  * connection, and the direction is always drag-start → drop target.
  */
-function Handles({ kind }: { kind: DesignNode["kind"] }) {
+export function Handles({ kind }: { kind: DesignNode["kind"] }) {
   // Edges still need the handles to attach to; read-only just never reveals them.
   const readOnly = useDesigner((s) => s.readOnly);
   return SIDES.map(([id, position]) => (
@@ -56,7 +56,7 @@ function Handles({ kind }: { kind: DesignNode["kind"] }) {
   ));
 }
 
-const selectedRing = "ring-2 ring-primary/60 ring-offset-2 ring-offset-canvas";
+export const selectedRing = "ring-2 ring-primary/60 ring-offset-2 ring-offset-canvas";
 
 function subtitleOf(n: DesignNode): string {
   switch (n.kind) {
@@ -100,10 +100,10 @@ const METRIC_ICON: Record<CardMetric["key"], LucideIcon> = {
   tags: Tag,
 };
 
-const chip =
+export const chip =
   "inline-flex h-[18px] shrink-0 items-center gap-1 rounded-md border bg-background px-1.5 text-[11px] leading-none font-medium tabular-nums";
 
-function StatusChip({ status }: { status: NonNullable<FlowNode["data"]["status"]> }) {
+export function StatusChip({ status }: { status: NonNullable<FlowNode["data"]["status"]> }) {
   const style = STATUS_STYLE[status.status];
   const Icon = style.icon;
   return (
@@ -128,7 +128,7 @@ function StatusChip({ status }: { status: NonNullable<FlowNode["data"]["status"]
 }
 
 /** The footer row: metric chips (icon + count) and the agent-reported status. */
-function Chips({ data, className }: { data: FlowNode["data"]; className?: string }) {
+export function Chips({ data, className }: { data: FlowNode["data"]; className?: string }) {
   const { node, status } = data;
   const metrics = cardMetrics(node);
   if (metrics.length === 0 && !status) return null;
@@ -175,7 +175,7 @@ function IconTile({ kind, small }: { kind: DesignNode["kind"]; small?: boolean }
 }
 
 /** Icon tile, name and a muted subtitle (the kind's label when there's nothing more specific). */
-function Title({ node, subtitle: override }: { node: DesignNode; subtitle?: string }) {
+export function Title({ node, subtitle: override }: { node: DesignNode; subtitle?: string }) {
   const subtitle = override || subtitleOf(node) || NODE_KIND_META[node.kind].label;
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -193,7 +193,7 @@ function Title({ node, subtitle: override }: { node: DesignNode; subtitle?: stri
 }
 
 /** Containers keep a one-line header: their children start close to the top edge. */
-function ContainerTitle({ node }: { node: DesignNode }) {
+export function ContainerTitle({ node }: { node: DesignNode }) {
   const subtitle = subtitleOf(node) || NODE_KIND_META[node.kind].label;
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1.5 text-xs">
@@ -209,7 +209,7 @@ function ContainerTitle({ node }: { node: DesignNode }) {
 }
 
 /** Drills the levels view into a node. */
-function OpenButton({ node }: { node: DesignNode }) {
+export function OpenButton({ node }: { node: DesignNode }) {
   return (
     <Button
       variant="ghost"
@@ -227,7 +227,7 @@ function OpenButton({ node }: { node: DesignNode }) {
   );
 }
 
-const card =
+export const card =
   "group/node w-52 rounded-xl border bg-card p-2.5 shadow-[0_1px_3px_0_rgb(0_0_0/0.04)] transition-shadow hover:shadow-md";
 
 function Grip() {

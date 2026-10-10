@@ -43,6 +43,7 @@ import { LevelBreadcrumb } from "@/components/designer/level-breadcrumb";
 import { KIND_STYLE } from "@/components/designer/nodes/kind-style";
 import { nodeTypes } from "@/components/designer/nodes";
 import { DRAG_MIME, Palette } from "@/components/designer/palette";
+import { PerspectiveSwitch } from "@/components/designer/perspective-switch";
 import {
   useDesigner,
   useDesignerStore,
@@ -50,6 +51,8 @@ import {
 } from "@/components/designer/store-provider";
 import {
   keepMeasured,
+  perspectiveEdges,
+  perspectiveNodes,
   toFlowEdges,
   toFlowNodes,
   type FlowEdge,
@@ -78,8 +81,14 @@ import {
   type Point,
 } from "@/lib/design/geometry";
 import { isFocusable, levelOf, levelView, type LevelView } from "@/lib/design/levels";
+import {
+  designIdOf,
+  perspectiveView,
+  type Perspective,
+  type PerspectiveView,
+} from "@/lib/design/perspectives";
 import { NODE_KINDS, type EdgeKind, type NodeKind } from "@/lib/design/schema";
-import { useCanvasUi } from "@/stores/canvas-ui-store";
+import { useCanvasUi, type ViewMode } from "@/stores/canvas-ui-store";
 import { useSelection } from "@/stores/selection-store";
 import { useStatusStore } from "@/stores/status-store";
 
@@ -106,13 +115,42 @@ function readViewport(slug: string): Viewport | null {
   }
 }
 
-/** The levels view for the current UI state, or undefined in the "all" view. */
-function viewFor(
-  doc: Parameters<typeof levelView>[0],
-  ui: { viewMode: string; focusId: string | null },
-): LevelView | undefined {
-  return ui.viewMode === "levels" ? levelView(doc, ui.focusId) : undefined;
+type Doc = Parameters<typeof levelView>[0];
+type UiView = { perspective: Perspective; viewMode: ViewMode; focusId: string | null };
+
+/** The Architecture perspective's levels view, or undefined (the "all" view, other perspectives). */
+function viewFor(doc: Doc, ui: UiView): LevelView | undefined {
+  return ui.perspective === "architecture" && ui.viewMode === "levels"
+    ? levelView(doc, ui.focusId)
+    : undefined;
 }
+
+/** The generated API / Layers diagram, or undefined in the Architecture perspective. */
+function lensFor(doc: Doc, ui: UiView): PerspectiveView | undefined {
+  return ui.perspective === "architecture" ? undefined : perspectiveView(doc, ui.perspective, ui);
+}
+
+function flowFor(
+  doc: Doc,
+  statuses: Parameters<typeof toFlowNodes>[1],
+  selected: ReadonlySet<string>,
+  ui: UiView,
+): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  const lens = lensFor(doc, ui);
+  if (lens)
+    return {
+      nodes: perspectiveNodes(lens, statuses, selected),
+      edges: perspectiveEdges(doc, lens, selected),
+    };
+  const view = viewFor(doc, ui);
+  return {
+    nodes: toFlowNodes(doc, statuses, selected, view),
+    edges: toFlowEdges(doc, selected, view),
+  };
+}
+
+/** The view key whose viewport is remembered across visits. */
+const SAVED_VIEW = "architecture:all:";
 
 function useIsWide() {
   return useSyncExternalStore(
@@ -136,12 +174,12 @@ function Flow({ wide }: { wide: boolean }) {
   const validationOpen = useCanvasUi((s) => s.validationOpen);
   const document = useDesigner((s) => s.document);
   const readOnly = useDesigner((s) => s.readOnly);
+  const perspective = useCanvasUi((s) => s.perspective);
   const viewMode = useCanvasUi((s) => s.viewMode);
   const focusId = useCanvasUi((s) => s.focusId);
-  const view = useMemo(
-    () => viewFor(document, { viewMode, focusId }),
-    [document, viewMode, focusId],
-  );
+  const ui = useMemo(() => ({ perspective, viewMode, focusId }), [perspective, viewMode, focusId]);
+  const view = useMemo(() => viewFor(document, ui), [document, ui]);
+  const lens = useMemo(() => lensFor(document, ui), [document, ui]);
 
   const wrapper = useRef<HTMLDivElement>(null);
   const pointer = useRef({ x: 0, y: 0 });
@@ -152,19 +190,26 @@ function Flow({ wide }: { wide: boolean }) {
   } | null>(null);
   const [savedViewport] = useState(() => readViewport(slug));
 
-  const [initial] = useState(() => {
-    const doc = store.getState().document;
-    const v = viewFor(doc, useCanvasUi.getState());
-    return { nodes: toFlowNodes(doc, {}, NONE, v), edges: toFlowEdges(doc, NONE, v) };
-  });
+  const [initial] = useState(() =>
+    flowFor(store.getState().document, {}, NONE, useCanvasUi.getState()),
+  );
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>(initial.edges);
 
   // Store → canvas: rebuild when the document or statuses change.
   useEffect(() => {
     const selection = useSelection.getState();
-    setNodes((previous) => keepMeasured(toFlowNodes(document, statuses, NONE, view), previous));
-    setEdges(toFlowEdges(document, NONE, view));
+    const flow = lens
+      ? {
+          nodes: perspectiveNodes(lens, statuses, NONE),
+          edges: perspectiveEdges(document, lens, NONE),
+        }
+      : {
+          nodes: toFlowNodes(document, statuses, NONE, view),
+          edges: toFlowEdges(document, NONE, view),
+        };
+    setNodes((previous) => keepMeasured(flow.nodes, previous));
+    setEdges(flow.edges);
     // Selection ids that no longer exist must not linger in the inspector.
     const ids = new Set(document.nodes.map((n) => n.id));
     const edgeIds = new Set(document.edges.map((e) => e.id));
@@ -172,10 +217,13 @@ function Flow({ wide }: { wide: boolean }) {
       selection.nodeIds.filter((id) => ids.has(id)),
       selection.edgeIds.filter((id) => edgeIds.has(id)),
     );
-  }, [document, statuses, view, setNodes, setEdges]);
+  }, [document, statuses, view, lens, setNodes, setEdges]);
 
-  // Changing level frames the new view; going back to "all" restores its saved viewport.
-  const viewKey = view ? `levels:${view.focus?.id ?? ""}` : "all";
+  // Changing perspective or level frames the new view; going back to the Architecture "all"
+  // view restores its saved viewport.
+  const viewKey = `${perspective}:${viewMode}:${
+    viewMode === "all" ? "" : view ? (view.focus?.id ?? "") : (focusId ?? "")
+  }`;
   const shownViewKey = useRef(viewKey);
   /** Set by focus() when it centres a node itself right after switching level. */
   const skipFit = useRef(false);
@@ -188,7 +236,7 @@ function Flow({ wide }: { wide: boolean }) {
     }
     // Wait a frame so React Flow has measured the new nodes.
     const timer = window.setTimeout(() => {
-      const saved = viewKey === "all" ? readViewport(slug) : null;
+      const saved = viewKey === SAVED_VIEW ? readViewport(slug) : null;
       if (saved) void rf.setViewport(saved, { duration: 200 });
       else void rf.fitView({ duration: 200, padding: 0.15, maxZoom: 1.25 });
     }, 50);
@@ -202,9 +250,11 @@ function Flow({ wide }: { wide: boolean }) {
   const selectedEdgeIds = useSelection((s) => s.edgeIds);
   const shownNodes = useMemo(() => {
     const selected = new Set(selectedNodeIds);
-    return nodes.map((n) =>
-      !!n.selected === selected.has(n.id) ? n : { ...n, selected: selected.has(n.id) },
-    );
+    // A perspective can draw one component more than once: every copy shows the selection.
+    return nodes.map((n) => {
+      const on = selected.has(designIdOf(n.id));
+      return !!n.selected === on ? n : { ...n, selected: on };
+    });
   }, [nodes, selectedNodeIds]);
   const shownEdges = useMemo(() => {
     const selected = new Set(selectedEdgeIds);
@@ -220,8 +270,8 @@ function Flow({ wide }: { wide: boolean }) {
         const current = useSelection.getState();
         const next = new Set(current.nodeIds);
         for (const c of picks) {
-          if (c.selected) next.add(c.id);
-          else next.delete(c.id);
+          if (c.selected) next.add(designIdOf(c.id));
+          else next.delete(designIdOf(c.id));
         }
         current.set([...next], current.edgeIds);
       }
@@ -312,14 +362,16 @@ function Flow({ wide }: { wide: boolean }) {
   );
 
   // ── Deleting ────────────────────────────────────────────────────────────
-  const onBeforeDelete = useCallback(
-    async ({ nodes: doomed, edges: doomedEdges }: { nodes: FlowNode[]; edges: FlowEdge[] }) => {
+  /** Asks before deleting components that have others nested inside them. */
+  const confirmDelete = useCallback(
+    async (nodeIds: string[], edgeCount: number) => {
       const doc = store.getState().document;
-      const roots = doomed.filter((n) => !doomed.some((o) => o.id === n.parentId));
+      const doomed = doc.nodes.filter((n) => nodeIds.includes(n.id));
+      const roots = doomed.filter((n) => !nodeIds.includes(n.parentId ?? ""));
       const total = new Set(roots.flatMap((n) => [...subtreeIds(doc, n.id)]));
       const nested = total.size - roots.length;
-      if (nested === 0) return doomed.length > 0 || doomedEdges.length > 0;
-      const first = roots[0]!.data.node.name;
+      if (nested === 0) return doomed.length > 0 || edgeCount > 0;
+      const first = roots[0]!.name;
       const subject = roots.length === 1 ? first : `${roots.length} components`;
       const ok = await new Promise<boolean>((resolve) =>
         setConfirm({
@@ -330,6 +382,14 @@ function Flow({ wide }: { wide: boolean }) {
       return ok;
     },
     [store],
+  );
+  const onBeforeDelete = useCallback(
+    ({ nodes: doomed, edges: doomedEdges }: { nodes: FlowNode[]; edges: FlowEdge[] }) =>
+      confirmDelete(
+        doomed.map((n) => n.id),
+        doomedEdges.length,
+      ),
+    [confirmDelete],
   );
 
   const onDelete = useCallback(
@@ -409,6 +469,10 @@ function Flow({ wide }: { wide: boolean }) {
       const meta = NODE_KIND_META[kind];
       const doc = store.getState().document;
       const ui = useCanvasUi.getState();
+      if (ui.perspective !== "architecture") {
+        toast.info("Switch to the Architecture perspective to add components");
+        return;
+      }
       const v = viewFor(doc, ui);
       if (v?.focus?.kind === "module") {
         toast.error("Go up a level to add components");
@@ -500,6 +564,7 @@ function Flow({ wide }: { wide: boolean }) {
     (event: DragEvent) => {
       const kind = event.dataTransfer.getData(DRAG_MIME) as NodeKind;
       if (!NODE_KINDS.includes(kind) || store.getState().readOnly) return;
+      if (useCanvasUi.getState().perspective !== "architecture") return;
       event.preventDefault();
       addNodeAt(kind, toAbsolute(rf.screenToFlowPosition({ x: event.clientX, y: event.clientY })));
     },
@@ -507,13 +572,43 @@ function Flow({ wide }: { wide: boolean }) {
   );
 
   // ── Actions exposed to the palette, inspector and validation panel ────────
+  /** Centres on what React Flow actually drew for these (React Flow) node ids. */
+  const centerOnDrawn = useCallback(
+    (flowIds: string[]) => {
+      const boxes = flowIds
+        .map((id) => rf.getInternalNode(id))
+        .filter((n) => n !== undefined)
+        .map((n) => ({
+          x: n.internals.positionAbsolute.x + (n.measured.width ?? 0) / 2,
+          y: n.internals.positionAbsolute.y + (n.measured.height ?? 0) / 2,
+        }));
+      if (boxes.length === 0) return;
+      const x = boxes.reduce((t, b) => t + b.x, 0) / boxes.length;
+      const y = boxes.reduce((t, b) => t + b.y, 0) / boxes.length;
+      void rf.setCenter(x, y, { zoom: Math.max(rf.getZoom(), 1), duration: 300 });
+    },
+    [rf],
+  );
+
   const focus = useCallback(
-    ({ nodeId, edgeId }: { nodeId?: string; edgeId?: string }) => {
+    function focus({ nodeId, edgeId }: { nodeId?: string; edgeId?: string }) {
       const doc = store.getState().document;
       const ui = useCanvasUi.getState();
+      const edge = edgeId ? doc.edges.find((e) => e.id === edgeId) : undefined;
+      const wanted = nodeId ? [nodeId] : edge ? [edge.source, edge.target] : [];
+      if (ui.perspective !== "architecture") {
+        const drawn = rf
+          .getNodes()
+          .filter((n) => wanted.includes(designIdOf(n.id)))
+          .map((n) => n.id);
+        if (drawn.length > 0) return centerOnDrawn(drawn);
+        // Not part of this perspective: show it in the Architecture one.
+        skipFit.current = true;
+        ui.setPerspective("architecture");
+        window.setTimeout(() => focus({ nodeId, edgeId }), 50);
+        return;
+      }
       if (ui.viewMode === "levels") {
-        const edge = edgeId ? doc.edges.find((e) => e.id === edgeId) : undefined;
-        const wanted = nodeId ? [nodeId] : edge ? [edge.source, edge.target] : [];
         if (!wanted.every((id) => doc.nodes.some((n) => n.id === id)) || wanted.length === 0)
           return;
         const v = viewFor(doc, ui)!;
@@ -524,40 +619,25 @@ function Flow({ wide }: { wide: boolean }) {
           ui.setFocus(levelOf(doc, wanted[0]!));
         }
         // Centre on what React Flow actually drew once the level has rendered.
-        window.setTimeout(() => {
-          const boxes = wanted
-            .map((id) => rf.getInternalNode(id))
-            .filter((n) => n !== undefined)
-            .map((n) => ({
-              x: n.internals.positionAbsolute.x + (n.measured.width ?? 0) / 2,
-              y: n.internals.positionAbsolute.y + (n.measured.height ?? 0) / 2,
-            }));
-          if (boxes.length === 0) return;
-          const x = boxes.reduce((t, b) => t + b.x, 0) / boxes.length;
-          const y = boxes.reduce((t, b) => t + b.y, 0) / boxes.length;
-          void rf.setCenter(x, y, { zoom: Math.max(rf.getZoom(), 1), duration: 300 });
-        }, 50);
+        window.setTimeout(() => centerOnDrawn(wanted), 50);
         return;
       }
       let point: { x: number; y: number } | null = null;
       if (nodeId && doc.nodes.some((n) => n.id === nodeId)) {
         const r = absoluteRect(doc, nodeId);
         point = { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-      } else if (edgeId) {
-        const edge = doc.edges.find((e) => e.id === edgeId);
-        if (edge) {
-          const a = absoluteRect(doc, edge.source);
-          const b = absoluteRect(doc, edge.target);
-          point = {
-            x: (a.x + a.width / 2 + b.x + b.width / 2) / 2,
-            y: (a.y + a.height / 2 + b.y + b.height / 2) / 2,
-          };
-        }
+      } else if (edge) {
+        const a = absoluteRect(doc, edge.source);
+        const b = absoluteRect(doc, edge.target);
+        point = {
+          x: (a.x + a.width / 2 + b.x + b.width / 2) / 2,
+          y: (a.y + a.height / 2 + b.y + b.height / 2) / 2,
+        };
       }
       if (point)
         void rf.setCenter(point.x, point.y, { zoom: Math.max(rf.getZoom(), 1), duration: 300 });
     },
-    [rf, store],
+    [rf, store, centerOnDrawn],
   );
 
   const current: CanvasActions = {
@@ -566,6 +646,15 @@ function Flow({ wide }: { wide: boolean }) {
     focus,
     deleteSelection: () => {
       const sel = useSelection.getState();
+      if (useCanvasUi.getState().perspective !== "architecture") {
+        // Perspective nodes aren't deletable in React Flow (and may be copies): go to the store.
+        void confirmDelete(sel.nodeIds, sel.edgeIds.length).then((ok) => {
+          if (!ok) return;
+          store.getState().removeElements({ nodeIds: sel.nodeIds, edgeIds: sel.edgeIds });
+          useSelection.getState().clear();
+        });
+        return;
+      }
       void rf.deleteElements({
         nodes: sel.nodeIds.map((id) => ({ id })),
         edges: sel.edgeIds.map((id) => ({ id })),
@@ -573,6 +662,7 @@ function Flow({ wide }: { wide: boolean }) {
     },
     fitView: () => void rf.fitView({ duration: 200, padding: 0.15 }),
     tidyLayout: () => {
+      if (useCanvasUi.getState().perspective !== "architecture") return;
       const v = viewFor(store.getState().document, useCanvasUi.getState());
       if (v?.focus?.kind === "module") return;
       store.getState().arrangeLayout(v?.focus?.id ?? null, { collapsed: !!v && !v.focus });
@@ -588,7 +678,7 @@ function Flow({ wide }: { wide: boolean }) {
   return (
     <CanvasActionsProvider actionsRef={actions}>
       <div className="flex min-h-0 min-w-0 flex-1">
-        {!readOnly && <Palette />}
+        {!readOnly && !lens && <Palette />}
         <div
           ref={wrapper}
           className="relative min-w-0 flex-1"
@@ -635,17 +725,17 @@ function Flow({ wide }: { wide: boolean }) {
             connectionRadius={40}
             snapToGrid
             snapGrid={SNAP}
-            nodesDraggable={!readOnly}
-            nodesConnectable={!readOnly}
-            deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
+            nodesDraggable={!readOnly && !lens}
+            nodesConnectable={!readOnly && !lens}
+            deleteKeyCode={readOnly || lens ? null : ["Backspace", "Delete"]}
             multiSelectionKeyCode="Shift"
-            defaultViewport={(!view && savedViewport) || undefined}
-            fitView={!!view || !savedViewport}
+            defaultViewport={(viewKey === SAVED_VIEW && savedViewport) || undefined}
+            fitView={viewKey !== SAVED_VIEW || !savedViewport}
             fitViewOptions={{ padding: 0.15 }}
             minZoom={0.1}
             onMoveEnd={(_, viewport) => {
-              // Only the "all" view keeps its viewport; levels are framed when opened.
-              if (useCanvasUi.getState().viewMode !== "all") return;
+              // Only the Architecture "all" view keeps its viewport; the rest are framed when opened.
+              if (shownViewKey.current !== SAVED_VIEW) return;
               try {
                 window.localStorage.setItem(viewportKey(slug), JSON.stringify(viewport));
               } catch {
@@ -672,7 +762,12 @@ function Flow({ wide }: { wide: boolean }) {
                   Read-only
                 </span>
               )}
-              {view && <LevelBreadcrumb focusId={view.focus?.id ?? null} />}
+              {viewMode === "levels" && (
+                <LevelBreadcrumb focusId={view ? (view.focus?.id ?? null) : focusId} />
+              )}
+            </Panel>
+            <Panel position="top-center">
+              <PerspectiveSwitch />
             </Panel>
             {view?.focus?.kind === "module" && (
               <Panel position="top-right" className="mr-14!">
@@ -685,6 +780,13 @@ function Flow({ wide }: { wide: boolean }) {
               </Panel>
             )}
           </ReactFlow>
+          {lens?.empty && (
+            <div className="pointer-events-none absolute inset-0 grid place-items-center p-8">
+              <p className="max-w-sm rounded-xl border bg-background px-4 py-3 text-center text-sm text-muted-foreground shadow-xs">
+                {lens.empty}
+              </p>
+            </div>
+          )}
           {menu && (
             <EdgeKindMenu
               menu={menu}

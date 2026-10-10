@@ -26,6 +26,8 @@ const STYLE: Record<EdgeKind, { stroke: string; width: number; dash?: string }> 
   interacts: { stroke: "#14b8a6", width: 1.25 },
 };
 
+const VIOLATION = "#ef4444";
+
 interface Box {
   x: number;
   y: number;
@@ -82,7 +84,8 @@ export function DesignEdgeView({ id, source, target, data, selected }: EdgeProps
     borderRadius: 8,
   });
   const style = STYLE[data.edge.kind];
-  const stroke = selected ? "var(--primary)" : style.stroke;
+  // A dependency that breaks the layer rules is drawn red in the Layers perspective.
+  const stroke = selected ? "var(--primary)" : data.violation ? VIOLATION : style.stroke;
   // Lifted edge ids contain ":", which doesn't belong in a url(#…) reference.
   const marker = `pd-arrow-${id.replace(/[^A-Za-z0-9_-]/g, "_")}`;
   const lifted = data.lifted ?? 0;

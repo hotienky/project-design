@@ -59,6 +59,7 @@ export function Toolbar() {
   const actions = useCanvasActions();
   const validationOpen = useCanvasUi((s) => s.validationOpen);
   const minimapOpen = useCanvasUi((s) => s.minimapOpen);
+  const perspective = useCanvasUi((s) => s.perspective);
   const viewMode = useCanvasUi((s) => s.viewMode);
   const focusId = useCanvasUi((s) => s.focusId);
   // A module's level is drawn from its endpoints, with nothing to arrange.
@@ -97,7 +98,7 @@ export function Toolbar() {
       </Tool>
       <Tool
         label="Tidy layout: arrange as a tree"
-        disabled={readOnly || moduleLevel}
+        disabled={readOnly || moduleLevel || perspective !== "architecture"}
         onClick={() => actions.tidyLayout()}
       >
         <Network />

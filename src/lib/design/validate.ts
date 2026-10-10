@@ -166,6 +166,19 @@ function checkNames(doc: DesignDocument, add: Add) {
   }
 }
 
+/**
+ * A depends_on or calls edge between modules in two layers of one service, where the source's
+ * layer has no depends_on edge to the target's layer.
+ */
+export function isLayerViolation(index: DesignIndex, e: DesignEdge): boolean {
+  if (e.kind !== "depends_on" && e.kind !== "calls") return false;
+  const a = index.layerOf(e.source);
+  const b = index.layerOf(e.target);
+  if (!a || !b || a.id === b.id) return false;
+  if (index.serviceOf(a.id)?.id !== index.serviceOf(b.id)?.id) return false;
+  return !index.outgoing(a.id, "depends_on").some((d) => d.target === b.id);
+}
+
 function checkLayers(index: DesignIndex, add: Add) {
   const { doc } = index;
   for (const n of doc.nodes) {
@@ -174,13 +187,9 @@ function checkLayers(index: DesignIndex, add: Add) {
     }
   }
   for (const e of doc.edges) {
-    if (e.kind !== "depends_on" && e.kind !== "calls") continue;
-    const a = index.layerOf(e.source);
-    const b = index.layerOf(e.target);
-    if (!a || !b || a.id === b.id) continue;
-    if (index.serviceOf(a.id)?.id !== index.serviceOf(b.id)?.id) continue;
-    const allowed = index.outgoing(a.id, "depends_on").some((d) => d.target === b.id);
-    if (allowed) continue;
+    if (!isLayerViolation(index, e)) continue;
+    const a = index.layerOf(e.source)!;
+    const b = index.layerOf(e.target)!;
     const from = index.node(e.source)!;
     const to = index.node(e.target)!;
     add(

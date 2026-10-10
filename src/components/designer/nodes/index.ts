@@ -7,10 +7,17 @@ import {
   NoteNode,
   SummaryNode,
 } from "@/components/designer/nodes/base-node";
+import {
+  ApiOperationsNode,
+  LayerBandNode,
+  PerspectiveCardNode,
+  ServiceFrameNode,
+} from "@/components/designer/nodes/perspective-nodes";
 
 /**
  * React Flow node types, keyed by design node kind, plus "summary" for the levels view's
- * collapsed containers and context nodes. Defined once (a stable reference).
+ * collapsed containers and context nodes, plus the API / Layers perspectives' own node types.
+ * Defined once (a stable reference).
  */
 export const nodeTypes = {
   service: ContainerNode,
@@ -24,4 +31,8 @@ export const nodeTypes = {
   entity: EntityNode,
   note: NoteNode,
   summary: SummaryNode,
+  perspectiveCard: PerspectiveCardNode,
+  apiOperations: ApiOperationsNode,
+  serviceFrame: ServiceFrameNode,
+  layerBand: LayerBandNode,
 } satisfies NodeTypes;
