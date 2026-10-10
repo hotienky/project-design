@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Trash2, X } from "lucide-react";
+import { ChevronRight, PanelRightClose, PanelRightOpen, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 import { useCanvasActions } from "@/components/designer/canvas-actions";
@@ -10,8 +10,10 @@ import { KIND_STYLE } from "@/components/designer/nodes/kind-style";
 import { useDesigner } from "@/components/designer/store-provider";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NODE_KIND_META } from "@/lib/design/catalog";
 import { NODE_KINDS, type NodeKind } from "@/lib/design/schema";
+import { useCanvasUi } from "@/stores/canvas-ui-store";
 import { useSelection } from "@/stores/selection-store";
 
 /** Read-only greys out every control at once (a disabled fieldset disables all of them). */
@@ -153,6 +155,7 @@ function Editor() {
 function Header() {
   const nodeIds = useSelection((s) => s.nodeIds);
   const edgeIds = useSelection((s) => s.edgeIds);
+  const toggleOpen = useCanvasUi((s) => s.toggleRightSidebar);
   const kind = useDesigner((s) =>
     nodeIds.length === 1 && edgeIds.length === 0
       ? s.document.nodes.find((n) => n.id === nodeIds[0])?.kind
@@ -168,32 +171,75 @@ function Header() {
           ? `Editing ${NODE_KIND_META[kind].label.toLowerCase()}`
           : "Editing connection";
   return (
-    <header className="sticky top-0 z-10 flex items-start justify-between gap-2 border-b bg-background px-4 py-3">
-      <div>
+    <header className="sticky top-0 z-10 flex items-start justify-between gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur-sm">
+      <div className="min-w-0 flex-1">
         <h2 className="text-sm font-semibold">Inspector</h2>
-        <p className="text-xs text-muted-foreground">{subtitle}</p>
+        <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
       </div>
-      {total > 0 && (
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          aria-label="Clear selection"
-          onClick={() => useSelection.getState().clear()}
-        >
-          <X />
-        </Button>
-      )}
+      <div className="flex items-center gap-1">
+        {total > 0 && (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Clear selection"
+            onClick={() => useSelection.getState().clear()}
+            className="size-7"
+          >
+            <X className="size-3.5" />
+          </Button>
+        )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Collapse inspector (])"
+              onClick={toggleOpen}
+              className="size-7 text-muted-foreground hover:text-foreground"
+            >
+              <PanelRightClose className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="left">Collapse inspector (])</TooltipContent>
+        </Tooltip>
+      </div>
     </header>
   );
 }
 
 export function Inspector({ wide }: { wide: boolean }) {
   const hasSelection = useSelection((s) => s.nodeIds.length + s.edgeIds.length > 0);
+  const isOpen = useCanvasUi((s) => s.rightSidebarOpen);
+  const toggleOpen = useCanvasUi((s) => s.toggleRightSidebar);
+
   if (wide) {
+    if (!isOpen) {
+      return (
+        <aside
+          aria-label="Collapsed inspector"
+          className="flex w-11 shrink-0 flex-col items-center border-l bg-background/95 py-2 backdrop-blur-sm transition-all"
+        >
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={toggleOpen}
+                aria-label="Expand inspector (])"
+                className="size-8 text-muted-foreground hover:text-foreground"
+              >
+                <PanelRightOpen className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">Expand inspector (])</TooltipContent>
+          </Tooltip>
+        </aside>
+      );
+    }
     return (
       <aside
         aria-label="Inspector"
-        className="w-90 shrink-0 overflow-y-auto border-l bg-background"
+        className="w-90 shrink-0 overflow-y-auto border-l bg-background transition-all"
       >
         <Header />
         <Content />

@@ -251,11 +251,14 @@ function Flow({ wide }: { wide: boolean }) {
   const shownNodes = useMemo(() => {
     const selected = new Set(selectedNodeIds);
     // A perspective can draw one component more than once: every copy shows the selection.
+    // Nodes can only be dragged when focused (selected) to prevent accidental displacements.
     return nodes.map((n) => {
       const on = selected.has(designIdOf(n.id));
-      return !!n.selected === on ? n : { ...n, selected: on };
+      const shouldBeDraggable = !readOnly && !lens && n.draggable !== false && on;
+      if (!!n.selected === on && n.draggable === shouldBeDraggable) return n;
+      return { ...n, selected: on, draggable: shouldBeDraggable };
     });
-  }, [nodes, selectedNodeIds]);
+  }, [nodes, selectedNodeIds, readOnly, lens]);
   const shownEdges = useMemo(() => {
     const selected = new Set(selectedEdgeIds);
     return edges.map((e) =>
@@ -274,6 +277,9 @@ function Flow({ wide }: { wide: boolean }) {
           else next.delete(designIdOf(c.id));
         }
         current.set([...next], current.edgeIds);
+        if (picks.some((c) => c.selected)) {
+          useCanvasUi.getState().setRightSidebarOpen(true);
+        }
       }
       const rest = changes.filter((c) => c.type !== "select");
       if (rest.length > 0) onNodesChange(rest);
@@ -669,6 +675,9 @@ function Flow({ wide }: { wide: boolean }) {
       // Wait a frame so React Flow has the new positions before framing them.
       window.setTimeout(() => void rf.fitView({ duration: 300, padding: 0.15 }), 50);
     },
+    zoomIn: () => void rf.zoomIn({ duration: 150 }),
+    zoomOut: () => void rf.zoomOut({ duration: 150 }),
+    resetZoom: () => void rf.zoomTo(1, { duration: 150 }),
   };
   const actions = useRef(current);
   useEffect(() => {
@@ -678,7 +687,7 @@ function Flow({ wide }: { wide: boolean }) {
   return (
     <CanvasActionsProvider actionsRef={actions}>
       <div className="flex min-h-0 min-w-0 flex-1">
-        {!readOnly && !lens && <Palette />}
+        <Palette />
         <div
           ref={wrapper}
           className="relative min-w-0 flex-1"
@@ -753,29 +762,32 @@ function Flow({ wide }: { wide: boolean }) {
                 nodeColor={(n) => KIND_STYLE[n.data.node.kind]?.hex ?? "#888"}
               />
             )}
-            <Controls position="top-right" showInteractive={false} />
-            <Panel position="top-left" className="flex items-center gap-2">
-              <Toolbar />
+            {/* Top-center: Perspective Switch & Level breadcrumbs */}
+            <Panel position="top-center" className="flex items-center gap-2">
+              <PerspectiveSwitch />
+              {viewMode === "levels" && (
+                <LevelBreadcrumb focusId={view ? (view.focus?.id ?? null) : focusId} />
+              )}
               {readOnly && (
-                <span className="flex h-8 items-center gap-1.5 rounded-lg border bg-background px-2.5 text-xs font-medium text-muted-foreground shadow-xs">
+                <span className="flex h-7 items-center gap-1.5 rounded-lg border bg-background/90 px-2 text-xs font-medium text-muted-foreground shadow-xs">
                   <Lock className="size-3.5" aria-hidden />
                   Read-only
                 </span>
               )}
-              {viewMode === "levels" && (
-                <LevelBreadcrumb focusId={view ? (view.focus?.id ?? null) : focusId} />
-              )}
             </Panel>
-            <Panel position="top-center">
-              <PerspectiveSwitch />
+
+            {/* Bottom-center: Ergonomic Floating Dock */}
+            <Panel position="bottom-center" className="mb-2">
+              <Toolbar />
             </Panel>
+
             {view?.focus?.kind === "module" && (
-              <Panel position="top-right" className="mr-14!">
+              <Panel position="top-right" className="mr-4">
                 <EndpointsPanel focus={view.focus} />
               </Panel>
             )}
             {validationOpen && (
-              <Panel position="bottom-left">
+              <Panel position="bottom-left" className="mb-2 ml-2">
                 <ValidationPanel />
               </Panel>
             )}
