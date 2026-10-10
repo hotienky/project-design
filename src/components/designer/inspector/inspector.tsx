@@ -1,6 +1,7 @@
 "use client";
 
-import { Trash2, X } from "lucide-react";
+import { ChevronRight, Trash2, X } from "lucide-react";
+import { useState } from "react";
 
 import { useCanvasActions } from "@/components/designer/canvas-actions";
 import { EdgeForm } from "@/components/designer/inspector/edge-form";
@@ -10,16 +11,95 @@ import { useDesigner } from "@/components/designer/store-provider";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { NODE_KIND_META } from "@/lib/design/catalog";
-import { NODE_KINDS } from "@/lib/design/schema";
+import { NODE_KINDS, type NodeKind } from "@/lib/design/schema";
 import { useSelection } from "@/stores/selection-store";
 
 /** Read-only greys out every control at once (a disabled fieldset disables all of them). */
 function Content() {
   const readOnly = useDesigner((s) => s.readOnly);
+  const hasSelection = useSelection((s) => s.nodeIds.length + s.edgeIds.length > 0);
+  // Browsing the component list stays available in read-only mode.
+  if (!hasSelection) return <ComponentList />;
   return (
     <fieldset disabled={readOnly} className="contents">
       <Editor />
     </fieldset>
+  );
+}
+
+/** Nothing selected: node counts per kind; a kind expands to its nodes, a node is selected and centred. */
+function ComponentList() {
+  const document = useDesigner((s) => s.document);
+  const actions = useCanvasActions();
+  const [open, setOpen] = useState<ReadonlySet<NodeKind>>(new Set());
+
+  function toggle(kind: NodeKind) {
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(kind)) next.add(kind);
+      return next;
+    });
+  }
+
+  function select(nodeId: string) {
+    useSelection.getState().set([nodeId], []);
+    actions.focus({ nodeId });
+  }
+
+  return (
+    <section className="grid gap-3 p-4">
+      <div className="flex items-baseline justify-between">
+        <h3 className="text-sm font-semibold">Components</h3>
+        <span className="text-xs text-muted-foreground">{document.edges.length} connections</span>
+      </div>
+      <ul className="grid gap-1.5 text-sm">
+        {NODE_KINDS.map((kind) => {
+          const nodes = document.nodes
+            .filter((n) => n.kind === kind)
+            .sort((a, b) => a.name.localeCompare(b.name));
+          const expanded = open.has(kind) && nodes.length > 0;
+          const Icon = KIND_STYLE[kind].icon;
+          return (
+            <li key={kind} className="rounded-xl border bg-card shadow-xs">
+              <button
+                type="button"
+                disabled={nodes.length === 0}
+                aria-expanded={expanded}
+                onClick={() => toggle(kind)}
+                className="flex w-full items-center gap-2.5 rounded-xl p-1.5 pr-2.5 text-left outline-none hover:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:hover:bg-transparent"
+              >
+                <span className="grid size-7 shrink-0 place-items-center rounded-lg border bg-background">
+                  <Icon className={`size-3.5 ${KIND_STYLE[kind].text}`} aria-hidden />
+                </span>
+                <span className="flex-1 font-medium">{NODE_KIND_META[kind].label}</span>
+                <span className="rounded-md border bg-background px-1.5 text-xs font-medium tabular-nums text-muted-foreground">
+                  {nodes.length}
+                </span>
+                <ChevronRight
+                  aria-hidden
+                  className={`size-3.5 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""} ${nodes.length === 0 ? "invisible" : ""}`}
+                />
+              </button>
+              {expanded && (
+                <ul className="grid gap-0.5 border-t p-1">
+                  {nodes.map((node) => (
+                    <li key={node.id}>
+                      <button
+                        type="button"
+                        onClick={() => select(node.id)}
+                        className="w-full truncate rounded-lg px-2 py-1 text-left outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      >
+                        {node.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -30,36 +110,6 @@ function Editor() {
   const actions = useCanvasActions();
 
   const total = nodeIds.length + edgeIds.length;
-  if (total === 0) {
-    return (
-      <section className="grid gap-3 p-4">
-        <div className="flex items-baseline justify-between">
-          <h3 className="text-sm font-semibold">Components</h3>
-          <span className="text-xs text-muted-foreground">{document.edges.length} connections</span>
-        </div>
-        <ul className="grid gap-1.5 text-sm">
-          {NODE_KINDS.map((kind) => {
-            const count = document.nodes.filter((n) => n.kind === kind).length;
-            const Icon = KIND_STYLE[kind].icon;
-            return (
-              <li
-                key={kind}
-                className="flex items-center gap-2.5 rounded-xl border bg-card p-1.5 pr-2.5 shadow-xs"
-              >
-                <span className="grid size-7 shrink-0 place-items-center rounded-lg border bg-background">
-                  <Icon className={`size-3.5 ${KIND_STYLE[kind].text}`} aria-hidden />
-                </span>
-                <span className="flex-1 font-medium">{NODE_KIND_META[kind].label}</span>
-                <span className="rounded-md border bg-background px-1.5 text-xs font-medium tabular-nums text-muted-foreground">
-                  {count}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-    );
-  }
   if (total > 1) {
     return (
       <div className="grid gap-3 p-4">
