@@ -83,12 +83,15 @@ export function DesignEdgeView({ id, source, target, data, selected }: EdgeProps
     targetPosition: to.position,
     borderRadius: 8,
   });
+  const lifted = data.lifted ?? 0;
   const style = STYLE[data.edge.kind];
-  // A dependency that breaks the layer rules is drawn red in the Layers perspective.
-  const stroke = selected ? "var(--primary)" : data.violation ? VIOLATION : style.stroke;
+  const isDimmed = data.dimmed;
+  const isHighlighted = data.highlighted || selected;
+  const stroke = isHighlighted ? "var(--primary)" : data.violation ? VIOLATION : style.stroke;
+  const strokeWidth = isHighlighted ? style.width + 1.25 : style.width;
+  const opacity = isDimmed ? 0.08 : lifted ? 0.55 : 1;
   // Lifted edge ids contain ":", which doesn't belong in a url(#…) reference.
   const marker = `pd-arrow-${id.replace(/[^A-Za-z0-9_-]/g, "_")}`;
-  const lifted = data.lifted ?? 0;
   return (
     <>
       <defs>
@@ -107,43 +110,47 @@ export function DesignEdgeView({ id, source, target, data, selected }: EdgeProps
       <BaseEdge
         id={id}
         path={path}
-        markerEnd={`url(#${marker})`}
+        markerEnd={isDimmed ? undefined : `url(#${marker})`}
         interactionWidth={16}
         style={{
           stroke,
-          strokeWidth: style.width + (selected ? 1 : 0),
+          strokeWidth,
+          opacity,
+          transition: "opacity 0.2s, stroke-width 0.2s",
           ...(style.dash ? { strokeDasharray: style.dash } : {}),
-          // Lifted edges are derived from nested ones: drawn fainter, never edited.
-          ...(lifted ? { opacity: 0.55 } : {}),
         }}
       />
-      <circle
-        cx={from.x}
-        cy={from.y}
-        r={3.5}
-        fill={stroke}
-        stroke="var(--background)"
-        strokeWidth={1.5}
-      />
-      <EdgeLabelRenderer>
-        <div
-          title={
-            lifted
-              ? `${lifted} connection${lifted === 1 ? "" : "s"} from nested components`
-              : undefined
-          }
-          className="nodrag nopan pointer-events-auto absolute rounded-full border bg-background px-2 py-0.5 text-[10px] leading-none font-medium shadow-xs"
-          style={{
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-            zIndex: Z.label,
-            borderColor: stroke,
-            color: `color-mix(in oklch, ${stroke} 70%, var(--foreground))`,
-          }}
-        >
-          {data.caption}
-          {lifted > 1 && ` ×${lifted}`}
-        </div>
-      </EdgeLabelRenderer>
+      {!isDimmed && (
+        <circle
+          cx={from.x}
+          cy={from.y}
+          r={3.5}
+          fill={stroke}
+          stroke="var(--background)"
+          strokeWidth={1.5}
+        />
+      )}
+      {!isDimmed && (
+        <EdgeLabelRenderer>
+          <div
+            title={
+              lifted
+                ? `${lifted} connection${lifted === 1 ? "" : "s"} from nested components`
+                : undefined
+            }
+            className="nodrag nopan pointer-events-auto absolute rounded-full border bg-background px-2 py-0.5 text-[10px] leading-none font-medium shadow-xs"
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              zIndex: isHighlighted ? Z.label + 1 : Z.label,
+              borderColor: stroke,
+              color: `color-mix(in oklch, ${stroke} 70%, var(--foreground))`,
+            }}
+          >
+            {data.caption}
+            {lifted > 1 && ` ×${lifted}`}
+          </div>
+        </EdgeLabelRenderer>
+      )}
     </>
   );
 }

@@ -1,18 +1,20 @@
 "use client";
 
 import {
+  Crosshair,
+  Database,
   Layers,
   LayoutGrid,
   Map as MapIcon,
   Maximize,
   Minus,
-  Network,
   PanelLeft,
   PanelRight,
   Plus,
   Redo2,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   Undo2,
 } from "lucide-react";
 import { useEffect } from "react";
@@ -75,22 +77,16 @@ export function Toolbar() {
 
   const validationOpen = useCanvasUi((s) => s.validationOpen);
   const minimapOpen = useCanvasUi((s) => s.minimapOpen);
-  const perspective = useCanvasUi((s) => s.perspective);
   const viewMode = useCanvasUi((s) => s.viewMode);
-  const focusId = useCanvasUi((s) => s.focusId);
   const leftOpen = useCanvasUi((s) => s.leftSidebarOpen);
   const rightOpen = useCanvasUi((s) => s.rightSidebarOpen);
+  const focusMode = useCanvasUi((s) => s.focusMode);
+  const collapseDatastores = useCanvasUi((s) => s.collapseDatastores);
 
   // Issues count for validation badge
   const issues = validateDesign(document, { layout: viewMode });
   const hasErrors = issues.some((i) => i.severity === "error");
   const hasWarnings = issues.some((i) => i.severity === "warning");
-
-  // A module's level is drawn from its endpoints, with nothing to arrange.
-  const moduleLevel = useDesigner(
-    (s) =>
-      viewMode === "levels" && s.document.nodes.find((n) => n.id === focusId)?.kind === "module",
-  );
 
   // Keyboard shortcuts for canvas toggle controls
   useEffect(() => {
@@ -99,6 +95,14 @@ export function Toolbar() {
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
         (e.target instanceof HTMLElement && e.target.isContentEditable)
+      ) {
+        return;
+      }
+      // Do not trigger canvas shortcuts if a modal dialog, alert dialog, or sheet is open
+      if (
+        window.document.querySelector('[role="dialog"], [role="alertdialog"]') ||
+        (e.target instanceof HTMLElement &&
+          e.target.closest('[role="dialog"], [role="alertdialog"]'))
       ) {
         return;
       }
@@ -112,6 +116,16 @@ export function Toolbar() {
         if (!e.metaKey && !e.ctrlKey) {
           e.preventDefault();
           actions.fitView();
+        }
+      } else if (e.key === "t" || e.key === "T") {
+        if (!e.metaKey && !e.ctrlKey) {
+          e.preventDefault();
+          useCanvasUi.getState().toggleFocusMode();
+        }
+      } else if (e.key === "w" || e.key === "W") {
+        if (!e.metaKey && !e.ctrlKey) {
+          e.preventDefault();
+          useCanvasUi.getState().startWalkthrough();
         }
       }
     }
@@ -162,14 +176,31 @@ export function Toolbar() {
         </Tool>
       </div>
 
-      {/* Layout arrangement */}
-      <Tool
-        label="Auto tidy layout: arrange as hierarchy tree"
-        disabled={readOnly || moduleLevel || perspective !== "architecture"}
-        onClick={() => actions.tidyLayout()}
-      >
-        <Network className="size-4" />
-      </Tool>
+      {/* Flow focus & datastore density controls */}
+      <div className="flex items-center divide-x divide-border/50">
+        <Tool
+          label={
+            focusMode
+              ? "Focus mode ON: trace flow & dim noise (T)"
+              : "Focus mode OFF: show all connections (T)"
+          }
+          pressed={focusMode}
+          onClick={() => useCanvasUi.getState().toggleFocusMode()}
+        >
+          <Crosshair className="size-4" />
+        </Tool>
+        <Tool
+          label={
+            collapseDatastores
+              ? "Datastores collapsed (clean view)"
+              : "Datastores expanded (showing all tables)"
+          }
+          pressed={collapseDatastores}
+          onClick={() => useCanvasUi.getState().toggleCollapseDatastores()}
+        >
+          <Database className="size-4" />
+        </Tool>
+      </div>
 
       {/* Zoom & Fit controls */}
       <div className="flex items-center divide-x divide-border/50">
@@ -210,6 +241,12 @@ export function Toolbar() {
           onClick={() => useCanvasUi.getState().toggleMinimap()}
         >
           <MapIcon className="size-4" />
+        </Tool>
+        <Tool
+          label="Tour architecture flow (W)"
+          onClick={() => useCanvasUi.getState().startWalkthrough()}
+        >
+          <Sparkles className="size-4 text-primary" />
         </Tool>
       </div>
 

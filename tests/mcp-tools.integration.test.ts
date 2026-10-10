@@ -121,6 +121,38 @@ describe("MCP tools", () => {
     );
     expect(mermaid.startsWith("erDiagram")).toBe(true);
 
+    const sqlModel = raw(
+      await call(client, "get_data_model", { datastore: "Main database", format: "sql" }),
+    );
+    expect(sqlModel).toContain("CREATE TABLE IF NOT EXISTS");
+
+    const archDiagram = raw(await call(client, "get_architecture_diagram"));
+    expect(archDiagram.startsWith("flowchart LR")).toBe(true);
+    expect(archDiagram).toContain("svc_web");
+    expect(archDiagram).toContain("svc_api");
+
+    const seqDiagram = raw(await call(client, "get_architecture_diagram", { type: "sequence" }));
+    expect(seqDiagram.startsWith("sequenceDiagram")).toBe(true);
+    expect(seqDiagram).toContain("participant");
+
+    const resolved = json(
+      await call(client, "resolve_file_to_component", {
+        filePath: "apps/api/src/domain/task.ts",
+      }),
+    );
+    expect(resolved.matched).toBe(true);
+    expect(resolved.component.id).toBe("lyr_domain");
+    expect(resolved.service.id).toBe("svc_api");
+    expect(resolved.layerRules).toContain("No framework or database imports");
+    expect(resolved.stack.map((s: { id: string }) => s.id)).toContain("stk_lang");
+
+    const unresolved = json(
+      await call(client, "resolve_file_to_component", {
+        filePath: "nonexistent/random/file.txt",
+      }),
+    );
+    expect(unresolved.matched).toBe(false);
+
     const plan = json(await call(client, "get_build_plan"));
     expect(plan.steps[0].id).toBe("setup");
 

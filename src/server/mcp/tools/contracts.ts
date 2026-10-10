@@ -1,8 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
-import { dataModel, toMermaidEr } from "@/lib/design/datamodel";
+import { dataModel, toMermaidEr, toSqlDdl } from "@/lib/design/datamodel";
 import type { DesignIndex } from "@/lib/design/graph";
+import { toMermaidArchitecture, toMermaidSequence } from "@/lib/design/mermaid";
 import { toOpenApi } from "@/lib/design/openapi";
 import type { NodeOfKind, TypeShape } from "@/lib/design/schema";
 import {
@@ -93,7 +94,7 @@ export function registerContractTools(server: McpServer, ctx: McpContext) {
         project: ProjectArg,
         version: VersionArg,
         datastore: z.string().optional().describe("Datastore id or exact name; omit for all."),
-        format: z.enum(["json", "mermaid"]).default("json"),
+        format: z.enum(["json", "mermaid", "sql"]).default("json"),
       }),
       annotations: READ_ONLY,
     },
@@ -101,7 +102,49 @@ export function registerContractTools(server: McpServer, ctx: McpContext) {
       const t = await resolveTarget(ctx, args);
       const store = args.datastore ? findNode(t.index, args.datastore, ["datastore"]) : undefined;
       const model = dataModel(t.index, store?.id);
+      if (args.format === "sql") return textResult(toSqlDdl(model));
       return args.format === "mermaid" ? textResult(toMermaidEr(model)) : jsonResult(model);
+    }),
+  );
+
+  server.registerTool(
+    "get_architecture_diagram",
+    {
+      title: "Get architecture diagram",
+      description:
+        "The architecture diagram rendered as Mermaid markdown. Supports high-level flowchart (graph LR/TD) and runtime sequence diagrams (sequenceDiagram).",
+      inputSchema: z.object({
+        project: ProjectArg,
+        version: VersionArg,
+        type: z
+          .enum(["flowchart", "sequence"])
+          .default("flowchart")
+          .describe("Diagram type: flowchart (static architecture) or sequence (runtime flow)."),
+        tag: z
+          .string()
+          .optional()
+          .describe("Tag filter for sequence diagram flows (e.g. 'auth', 'payment')."),
+        direction: z
+          .enum(["LR", "TD"])
+          .default("LR")
+          .describe("Direction of the flowchart (LR = Left to Right, TD = Top to Down)."),
+        includeNotes: z
+          .boolean()
+          .default(false)
+          .describe("Whether to include freeform sticky notes in the diagram."),
+      }),
+      annotations: READ_ONLY,
+    },
+    guarded(async (args) => {
+      const t = await resolveTarget(ctx, args);
+      if (args.type === "sequence") {
+        return textResult(toMermaidSequence(t.document, args.tag));
+      }
+      const mmd = toMermaidArchitecture(t.document, {
+        direction: args.direction,
+        includeNotes: args.includeNotes,
+      });
+      return textResult(mmd);
     }),
   );
 }

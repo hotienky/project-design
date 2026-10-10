@@ -15,6 +15,7 @@ import { NODE_KIND_META } from "@/lib/design/catalog";
 import { NODE_KINDS, type NodeKind } from "@/lib/design/schema";
 import { useCanvasUi } from "@/stores/canvas-ui-store";
 import { useSelection } from "@/stores/selection-store";
+import { WalkthroughSidebar } from "@/components/designer/walkthrough-sidebar";
 
 /** Read-only greys out every control at once (a disabled fieldset disables all of them). */
 function Content() {
@@ -208,9 +209,14 @@ function Header() {
 }
 
 export function Inspector({ wide }: { wide: boolean }) {
+  const walkthroughActive = useCanvasUi((s) => s.walkthroughActive);
   const hasSelection = useSelection((s) => s.nodeIds.length + s.edgeIds.length > 0);
   const isOpen = useCanvasUi((s) => s.rightSidebarOpen);
   const toggleOpen = useCanvasUi((s) => s.toggleRightSidebar);
+
+  if (walkthroughActive) {
+    return <WalkthroughSidebar wide={wide} />;
+  }
 
   if (wide) {
     if (!isOpen) {

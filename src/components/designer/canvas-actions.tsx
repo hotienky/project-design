@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useMemo, useRef, type RefObject } from "react";
 
+import type { ExportBackground } from "@/components/designer/export-image";
 import type { NodeKind } from "@/lib/design/schema";
 
 /** What the palette, inspector and validation panel can ask the canvas to do. */
@@ -20,6 +21,9 @@ export interface CanvasActions {
   zoomIn(): void;
   zoomOut(): void;
   resetZoom(): void;
+  exportImage(format: "png" | "svg"): Promise<void>;
+  /** Renders the canvas to a data URL for in-dialog preview (null when unavailable). */
+  renderPreviewImage(format: "png" | "svg", background: ExportBackground): Promise<string | null>;
 }
 
 const noop: CanvasActions = {
@@ -32,6 +36,10 @@ const noop: CanvasActions = {
   zoomIn() {},
   zoomOut() {},
   resetZoom() {},
+  async exportImage() {},
+  async renderPreviewImage() {
+    return null;
+  },
 };
 
 const Ctx = createContext<RefObject<CanvasActions> | null>(null);
@@ -65,6 +73,8 @@ export function useCanvasActions(): CanvasActions {
       zoomIn: () => ref.current.zoomIn(),
       zoomOut: () => ref.current.zoomOut(),
       resetZoom: () => ref.current.resetZoom(),
+      exportImage: (f) => ref.current.exportImage(f),
+      renderPreviewImage: (f, b) => ref.current.renderPreviewImage(f, b),
     }),
     [ref],
   );

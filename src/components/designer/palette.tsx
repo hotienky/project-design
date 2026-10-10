@@ -66,27 +66,25 @@ function PaletteButton({
   const style = KIND_STYLE[kind];
   const Icon = style.icon;
   const needsParent = !canContain(null, kind);
-  const disabled = needsParent && !(selectedKind && canContain(selectedKind, kind));
+  const canClickAdd = !needsParent || Boolean(selectedKind && canContain(selectedKind, kind));
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
-          draggable={!disabled}
+          draggable
           aria-label={`Add ${meta.label}`}
-          aria-disabled={disabled || undefined}
           onDragStart={(e) => {
             e.dataTransfer.setData(DRAG_MIME, kind);
             e.dataTransfer.effectAllowed = "copy";
           }}
-          onClick={() => !disabled && onAdd(kind)}
+          onClick={() => onAdd(kind)}
           className={cn(
             "group relative flex w-full min-w-0 cursor-grab items-center rounded-lg border text-left transition-all active:cursor-grabbing",
             layout === "grid"
               ? "h-9 gap-2 border-border/70 bg-card/75 px-2 py-1.5 shadow-2xs hover:border-primary/40 hover:bg-accent/80 hover:shadow-xs"
               : "h-8.5 gap-2.5 border-border/60 bg-card/60 px-2.5 py-1.5 shadow-2xs hover:border-primary/40 hover:bg-accent/80",
-            disabled && "cursor-not-allowed opacity-45 hover:border-border/60 hover:bg-card/60",
           )}
         >
           <span
@@ -149,10 +147,13 @@ function PaletteButton({
           )}
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">{meta.description}</p>
-        {disabled ? (
-          <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
-            Requires parent: {meta.parents.filter(Boolean).join(" or ")}
-          </p>
+        {needsParent && !canClickAdd ? (
+          <div className="flex flex-col gap-1 border-t border-border/40 pt-1.5 text-[10px] text-muted-foreground">
+            <span className="font-medium text-amber-600 dark:text-amber-400">
+              Requires container: {meta.parents.filter(Boolean).join(" or ")}
+            </span>
+            <span>Drag onto a container, or select one and click to add</span>
+          </div>
         ) : (
           <div className="flex items-center gap-2 border-t border-border/40 pt-1.5 text-[10px] text-muted-foreground/70">
             <span>Click to add</span>

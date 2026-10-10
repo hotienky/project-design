@@ -1,11 +1,12 @@
 "use client";
 
-import { ChevronDown, Download, PlugZap } from "lucide-react";
+import { Download, PlugZap } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import { useAppUrl, useProjectMeta, useSaveNow } from "@/components/designer/store-provider";
+import { useAppUrl } from "@/components/designer/store-provider";
 import { ConnectSnippets } from "@/components/settings/connect-snippets";
+import { ExportDiagramDialog } from "@/components/designer/export-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,42 +16,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-function download(url: string) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "";
-  document.body.append(link);
-  link.click();
-  link.remove();
-}
 
 export function ExportMenu() {
-  const { slug } = useProjectMeta();
-  const saveNow = useSaveNow();
-  // The server exports what it has saved, so flush pending edits first.
-  const run = (path: string) => async () => {
-    await saveNow();
-    download(`/api/projects/${slug}/${path}`);
-  };
+  const [diagramOpen, setDiagramOpen] = useState(false);
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm">
-          <Download /> Export <ChevronDown />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={run("export?version=draft")}>Design JSON</DropdownMenuItem>
-        <DropdownMenuItem onSelect={run("brief?version=draft")}>Markdown brief</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <Button variant="ghost" size="sm" onClick={() => setDiagramOpen(true)}>
+        <Download /> Export
+      </Button>
+      <ExportDiagramDialog open={diagramOpen} onOpenChange={setDiagramOpen} />
+    </>
   );
 }
 

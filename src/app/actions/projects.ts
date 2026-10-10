@@ -30,10 +30,12 @@ function invalid(error: z.ZodError): { ok: false; error: { code: string; message
   };
 }
 
+import { fullstackDesign, microservicesDesign } from "@/lib/design/examples/archetypes";
+
 const CreateInput = z.object({
   name: Name,
   description: Description.default(""),
-  template: z.enum(["blank", "example"]).default("blank"),
+  template: z.enum(["blank", "example", "fullstack", "microservices"]).default("blank"),
 });
 
 /** Creates a project and navigates to it. Only returns when something went wrong. */
@@ -43,11 +45,19 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
   let slug: string;
   try {
     const { userId } = await requirePrincipal();
+    const document =
+      parsed.data.template === "example"
+        ? teamTasksDesign
+        : parsed.data.template === "fullstack"
+          ? fullstackDesign
+          : parsed.data.template === "microservices"
+            ? microservicesDesign
+            : undefined;
     const project = await createProject(getDb(), {
       ownerId: userId,
       name: parsed.data.name,
       description: parsed.data.description,
-      document: parsed.data.template === "example" ? teamTasksDesign : undefined,
+      document,
     });
     slug = project.slug;
   } catch (error) {
