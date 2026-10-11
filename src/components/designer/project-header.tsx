@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { validateDesign } from "@/lib/design/validate";
+import { cn } from "@/lib/utils";
 import { useCanvasUi } from "@/stores/canvas-ui-store";
 
 const TABS = [
@@ -143,21 +144,53 @@ export function ProjectHeader() {
   const { slug, description } = useProjectMeta();
   const pathname = usePathname();
   return (
-    <div className="shrink-0 border-b bg-background">
-      <div className="flex h-14 items-center gap-3 px-4">
-        <span className="grid size-9 shrink-0 place-items-center rounded-lg border bg-background shadow-xs">
-          <Network className="size-4 text-muted-foreground" aria-hidden />
-        </span>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <ProjectName />
-            <SaveIndicator />
+    <div className="shrink-0 border-b bg-background/95 backdrop-blur-sm">
+      <div className="flex h-13 items-center justify-between gap-3 px-4">
+        {/* Left: Project identity */}
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg border bg-muted/50 shadow-2xs">
+            <Network className="size-4 text-foreground" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <ProjectName />
+              <SaveIndicator />
+            </div>
+            {description && (
+              <p className="hidden max-w-xs truncate text-[11px] text-muted-foreground 2xl:block">
+                {description}
+              </p>
+            )}
           </div>
-          <p className="max-w-xl truncate text-xs text-muted-foreground">
-            {description || "Architecture design for coding agents"}
-          </p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+
+        {/* Center: Tabs */}
+        <nav aria-label="Project sections" className="hidden lg:flex items-center">
+          <div className="inline-flex items-center gap-0.5 rounded-lg border border-border/80 bg-muted/60 p-0.5 shadow-2xs">
+            {TABS.map((tab) => {
+              const href = tab.segment ? `/projects/${slug}/${tab.segment}` : `/projects/${slug}`;
+              const active = pathname === href;
+              return (
+                <Link
+                  key={tab.label}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    active
+                      ? "bg-background font-semibold text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2">
           <div className="flex items-center divide-x overflow-hidden rounded-lg border bg-background shadow-xs [&>button]:rounded-none [&>button]:border-0 [&>button]:shadow-none">
             <ValidateButton />
             <ExportMenu />
@@ -167,8 +200,13 @@ export function ProjectHeader() {
           <PublishDialog />
         </div>
       </div>
-      <nav aria-label="Project sections" className="flex h-11 items-center px-4">
-        <div className="inline-flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
+
+      {/* Sub-nav row for mobile/smaller screens (< lg) */}
+      <nav
+        aria-label="Mobile project sections"
+        className="flex h-9 items-center border-t px-4 lg:hidden"
+      >
+        <div className="inline-flex items-center gap-0.5 rounded-lg bg-muted/60 p-0.5">
           {TABS.map((tab) => {
             const href = tab.segment ? `/projects/${slug}/${tab.segment}` : `/projects/${slug}`;
             const active = pathname === href;
@@ -177,7 +215,12 @@ export function ProjectHeader() {
                 key={tab.label}
                 href={href}
                 aria-current={active ? "page" : undefined}
-                className={`rounded-md px-3 py-1 text-sm transition-colors ${active ? "bg-background font-medium text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
+                className={cn(
+                  "rounded-md px-2 py-0.5 text-xs transition-colors",
+                  active
+                    ? "bg-background font-medium text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
               >
                 {tab.label}
               </Link>

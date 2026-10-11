@@ -1,8 +1,11 @@
 import { create } from "zustand";
 
 import type { Perspective } from "@/lib/design/perspectives";
+import type { NodeKind } from "@/lib/design/schema";
 
 export type ViewMode = "all" | "levels";
+export type LeftSidebarTab = "palette" | "explorer";
+export type PaletteLayout = "grid" | "list";
 
 interface CanvasUiState {
   /** Who the canvas is drawn for (see lib/design/perspectives.ts); independent of viewMode. */
@@ -15,6 +18,17 @@ interface CanvasUiState {
   minimapOpen: boolean;
   /** The "changed elsewhere" dialog (opened by autosave or the header). */
   conflictOpen: boolean;
+  /** Left sidebar visibility and active tab (Palette vs Project Explorer). */
+  leftSidebarOpen: boolean;
+  leftSidebarTab: LeftSidebarTab;
+  /** Palette layout mode: "grid" (compact 2-column) or "list" (compact 1-column). */
+  paletteLayout: PaletteLayout;
+  /** Right sidebar (Inspector) visibility. */
+  rightSidebarOpen: boolean;
+  /** Explorer search and filtering. */
+  searchQuery: string;
+  activeFilterKind: NodeKind | "all";
+
   setPerspective(perspective: Perspective): void;
   setViewMode(mode: ViewMode): void;
   /** Drill into a node (switching to the levels view), or back to the project with null. */
@@ -22,6 +36,25 @@ interface CanvasUiState {
   toggleValidation(open?: boolean): void;
   toggleMinimap(): void;
   setConflictOpen(open: boolean): void;
+  toggleLeftSidebar(): void;
+  setLeftSidebarOpen(open: boolean): void;
+  setLeftSidebarTab(tab: LeftSidebarTab): void;
+  setPaletteLayout(layout: PaletteLayout): void;
+  toggleRightSidebar(): void;
+  setRightSidebarOpen(open: boolean): void;
+  setSearchQuery(query: string): void;
+  setActiveFilterKind(kind: NodeKind | "all"): void;
+}
+
+export const PALETTE_LAYOUT_KEY = "pd:palette-layout";
+
+function persistPaletteLayout(layout: PaletteLayout): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PALETTE_LAYOUT_KEY, layout);
+  } catch {
+    // Storage unavailable
+  }
 }
 
 /** View toggles shared by the project header and the canvas toolbar. */
@@ -32,10 +65,28 @@ export const useCanvasUi = create<CanvasUiState>((set) => ({
   validationOpen: false,
   minimapOpen: true,
   conflictOpen: false,
+  leftSidebarOpen: true,
+  leftSidebarTab: "palette",
+  paletteLayout: "grid",
+  rightSidebarOpen: true,
+  searchQuery: "",
+  activeFilterKind: "all",
+
   setPerspective: (perspective) => set({ perspective }),
   setViewMode: (viewMode) => set({ viewMode }),
   setFocus: (focusId) => set({ viewMode: "levels", focusId }),
   toggleValidation: (open) => set((s) => ({ validationOpen: open ?? !s.validationOpen })),
   toggleMinimap: () => set((s) => ({ minimapOpen: !s.minimapOpen })),
   setConflictOpen: (open) => set({ conflictOpen: open }),
+  toggleLeftSidebar: () => set((s) => ({ leftSidebarOpen: !s.leftSidebarOpen })),
+  setLeftSidebarOpen: (leftSidebarOpen) => set({ leftSidebarOpen }),
+  setLeftSidebarTab: (leftSidebarTab) => set({ leftSidebarTab, leftSidebarOpen: true }),
+  setPaletteLayout: (paletteLayout) => {
+    persistPaletteLayout(paletteLayout);
+    set({ paletteLayout });
+  },
+  toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
+  setRightSidebarOpen: (rightSidebarOpen) => set({ rightSidebarOpen }),
+  setSearchQuery: (searchQuery) => set({ searchQuery }),
+  setActiveFilterKind: (activeFilterKind) => set({ activeFilterKind }),
 }));

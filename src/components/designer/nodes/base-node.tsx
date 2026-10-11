@@ -230,12 +230,19 @@ export function OpenButton({ node }: { node: DesignNode }) {
 export const card =
   "group/node w-52 rounded-xl border bg-card p-2.5 shadow-[0_1px_3px_0_rgb(0_0_0/0.04)] transition-shadow hover:shadow-md";
 
-function Grip() {
+function Grip({ selected }: { selected?: boolean }) {
   return (
-    <GripVertical
-      className="-mr-1 size-3.5 shrink-0 self-start text-muted-foreground/50 group-hover/node:text-muted-foreground"
-      aria-hidden
-    />
+    <span
+      title={selected ? "Drag to move" : "Click to select before dragging"}
+      className={cn(
+        "-mr-1 shrink-0 self-start transition-opacity",
+        selected
+          ? "cursor-grab text-muted-foreground opacity-100 active:cursor-grabbing"
+          : "text-muted-foreground/30 opacity-40 group-hover/node:opacity-75",
+      )}
+    >
+      <GripVertical className="size-3.5" aria-hidden />
+    </span>
   );
 }
 
@@ -244,12 +251,18 @@ export function CardNode({ data, selected }: NodeProps<FlowNode>) {
   // In the levels view a module can be opened, unless it's the one already open.
   const openable = useCanvasUi((s) => s.viewMode === "levels" && s.focusId !== data.node.id);
   return (
-    <div data-selected={selected} className={cn(card, selected && selectedRing)}>
+    <div
+      data-selected={selected}
+      className={cn(
+        card,
+        selected ? cn(selectedRing, "cursor-grab active:cursor-grabbing") : "cursor-pointer",
+      )}
+    >
       <Handles kind={data.node.kind} />
       <div className="flex items-start gap-1">
         <Title node={data.node} />
         {openable && isFocusable(data.node) && <OpenButton node={data.node} />}
-        <Grip />
+        <Grip selected={selected} />
       </div>
       <Chips data={data} className="mt-2" />
     </div>
@@ -261,31 +274,40 @@ export function EntityNode({ data, selected }: NodeProps<FlowNode>) {
   if (node.kind !== "entity") return null;
   const fields = node.data.fields.slice(0, ENTITY_FIELD_ROWS);
   return (
-    <div data-selected={selected} className={cn(card, selected && selectedRing)}>
+    <div
+      data-selected={selected}
+      className={cn(
+        card,
+        selected ? cn(selectedRing, "cursor-grab active:cursor-grabbing") : "cursor-pointer",
+      )}
+    >
       <Handles kind={node.kind} />
       <div className="flex items-start gap-1">
         <Title node={node} />
-        <Grip />
+        <Grip selected={selected} />
       </div>
       {fields.length > 0 && (
-        <ul className="mt-2 space-y-0.5 rounded-lg border bg-muted/40 px-2 py-1.5 font-mono text-[11px]">
+        <ul className="mt-2 space-y-0.5 rounded-lg border border-border/60 bg-muted/40 px-2 py-1.5 font-mono text-[11px]">
           {fields.map((f) => (
-            <li key={f.name} className="flex gap-1 truncate">
-              <span className="w-5 shrink-0 text-amber-600">
-                {f.primary ? "PK" : f.required ? "" : "?"}
+            <li key={f.name} className="flex items-center justify-between gap-1 truncate">
+              <span className="flex items-center gap-1 truncate">
+                {f.primary && (
+                  <span className="rounded bg-amber-500/15 px-1 py-0.2 text-[9px] font-semibold text-amber-600 dark:text-amber-400">
+                    PK
+                  </span>
+                )}
+                <span className="truncate font-medium">{f.name}</span>
+                {!f.required && !f.primary && <span className="text-muted-foreground/60">?</span>}
               </span>
-              <span className="truncate">
-                {f.name}:{" "}
-                <span className="text-muted-foreground">
-                  {f.type}
-                  {f.list ? "[]" : ""}
-                </span>
+              <span className="text-[10px] text-muted-foreground truncate">
+                {f.type}
+                {f.list ? "[]" : ""}
               </span>
             </li>
           ))}
           {node.data.fields.length > fields.length && (
-            <li className="text-muted-foreground">
-              +{node.data.fields.length - fields.length} more
+            <li className="pt-0.5 text-[10px] text-muted-foreground">
+              +{node.data.fields.length - fields.length} more fields
             </li>
           )}
         </ul>
@@ -304,7 +326,7 @@ export function NoteNode({ data, selected }: NodeProps<FlowNode>) {
       className={cn(
         "group/node h-28 w-52 overflow-hidden rounded-xl border border-black/5 p-3 text-xs shadow-[0_1px_3px_0_rgb(0_0_0/0.06)]",
         NOTE_COLORS[node.data.color],
-        selected && selectedRing,
+        selected ? cn(selectedRing, "cursor-grab active:cursor-grabbing") : "cursor-pointer",
       )}
     >
       <Handles kind={node.kind} />
@@ -327,10 +349,10 @@ export function ContainerNode({ id, data, selected }: NodeProps<FlowNode>) {
     <div
       data-selected={selected}
       className={cn(
-        "group/node h-full w-full rounded-xl border",
+        "group/node h-full w-full rounded-xl border shadow-xs transition-shadow",
         style.line,
         style.tint,
-        selected && selectedRing,
+        selected ? cn(selectedRing, "cursor-grab active:cursor-grabbing") : "cursor-pointer",
       )}
     >
       <NodeResizer
@@ -346,10 +368,12 @@ export function ContainerNode({ id, data, selected }: NodeProps<FlowNode>) {
         }
       />
       <Handles kind={data.node.kind} />
-      <div className="flex items-center gap-2 px-2 py-1">
+      <div className="flex items-center justify-between border-b border-inherit bg-background/85 px-3 py-1.5 backdrop-blur-xs rounded-t-xl">
         <ContainerTitle node={data.node} />
-        <Chips data={data} className="justify-end" />
-        {levels && <OpenButton node={data.node} />}
+        <div className="flex items-center gap-1.5">
+          <Chips data={data} className="justify-end" />
+          {levels && <OpenButton node={data.node} />}
+        </div>
       </div>
     </div>
   );
@@ -368,7 +392,7 @@ export function SummaryNode({ data, selected }: NodeProps<FlowNode>) {
       className={cn(
         card,
         context !== undefined && "border-dashed bg-card/70 shadow-none",
-        selected && selectedRing,
+        selected ? cn(selectedRing, "cursor-grab active:cursor-grabbing") : "cursor-pointer",
       )}
     >
       <Handles kind={node.kind} />

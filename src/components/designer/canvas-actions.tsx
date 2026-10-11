@@ -17,6 +17,9 @@ export interface CanvasActions {
   fitView(): void;
   /** Arrange what the current view shows as a tree, then frame it. */
   tidyLayout(): void;
+  zoomIn(): void;
+  zoomOut(): void;
+  resetZoom(): void;
 }
 
 const noop: CanvasActions = {
@@ -26,6 +29,9 @@ const noop: CanvasActions = {
   deleteSelection() {},
   fitView() {},
   tidyLayout() {},
+  zoomIn() {},
+  zoomOut() {},
+  resetZoom() {},
 };
 
 const Ctx = createContext<RefObject<CanvasActions> | null>(null);
@@ -56,6 +62,9 @@ export function useCanvasActions(): CanvasActions {
       deleteSelection: () => ref.current.deleteSelection(),
       fitView: () => ref.current.fitView(),
       tidyLayout: () => ref.current.tidyLayout(),
+      zoomIn: () => ref.current.zoomIn(),
+      zoomOut: () => ref.current.zoomOut(),
+      resetZoom: () => ref.current.resetZoom(),
     }),
     [ref],
   );
