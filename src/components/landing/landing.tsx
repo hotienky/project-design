@@ -2,9 +2,11 @@
 
 import {
   Bot,
+  Bug,
   Database,
   FileJson,
   GitCompare,
+  GitPullRequest,
   ListChecks,
   Network,
   PenTool,
@@ -13,7 +15,11 @@ import {
 } from "lucide-react";
 import { MotionConfig, motion } from "motion/react";
 
+import { GithubMark } from "@/components/landing/github-mark";
 import { HeroDiagram } from "@/components/landing/hero-diagram";
+import { Button } from "@/components/ui/button";
+
+const REPO_URL = "https://github.com/skordesign/project-design";
 
 const FEATURES: { icon: LucideIcon; title: string; body: string; color: string }[] = [
   {
@@ -92,6 +98,7 @@ export function Landing({ cta, notice }: { cta: React.ReactNode; notice?: React.
         <Hero cta={cta} notice={notice} />
         <Features />
         <HowItWorks />
+        <Contribute />
         <FinalCta cta={cta} />
         <footer className="border-t py-8 text-center text-xs text-muted-foreground">
           Project Design · design once, let agents build it
@@ -246,6 +253,44 @@ function HowItWorks() {
           ))}
         </motion.ol>
       </div>
+    </section>
+  );
+}
+
+function Contribute() {
+  return (
+    <section id="contribute" className="mx-auto w-full max-w-6xl scroll-mt-16 px-4 py-20 sm:px-6">
+      <SectionHeading
+        eyebrow="Open source"
+        title="Help build it"
+        body="Project Design is developed in the open. Bug fixes, new node kinds, MCP tools, docs: pull requests of any size are welcome, so feel free to open one."
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-60px" }}
+        transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
+        className="mt-8 flex flex-wrap justify-center gap-3"
+      >
+        <Button asChild size="lg" className="h-10 gap-2 px-4">
+          <a href={`${REPO_URL}/pulls`} target="_blank" rel="noreferrer">
+            <GitPullRequest className="size-4" aria-hidden />
+            Open a pull request
+          </a>
+        </Button>
+        <Button asChild size="lg" variant="outline" className="h-10 gap-2 px-4">
+          <a href={REPO_URL} target="_blank" rel="noreferrer">
+            <GithubMark className="size-4" />
+            View on GitHub
+          </a>
+        </Button>
+        <Button asChild size="lg" variant="ghost" className="h-10 gap-2 px-4">
+          <a href={`${REPO_URL}/issues`} target="_blank" rel="noreferrer">
+            <Bug className="size-4" aria-hidden />
+            Report an issue
+          </a>
+        </Button>
+      </motion.div>
     </section>
   );
 }

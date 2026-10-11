@@ -32,7 +32,7 @@ interface KindCategory {
   kinds: NodeKind[];
 }
 
-const CATEGORIES: KindCategory[] = [
+const SOFTWARE_CATEGORIES: KindCategory[] = [
   {
     title: "Architecture & Code",
     kinds: ["service", "layer", "module"],
@@ -49,6 +49,15 @@ const CATEGORIES: KindCategory[] = [
     title: "Context & Documentation",
     kinds: ["actor", "note"],
   },
+];
+
+const GAME_CATEGORIES: KindCategory[] = [
+  { title: "Game design", kinds: ["loop", "system", "mechanic", "resource", "content"] },
+  {
+    title: "Technical",
+    kinds: ["service", "layer", "module", "datastore", "entity", "api", "queue", "integration"],
+  },
+  { title: "Context & Documentation", kinds: ["actor", "note"] },
 ];
 
 function PaletteButton({
@@ -176,13 +185,15 @@ function PaletteContent() {
   const selectedKind = useDesigner(
     (s) => s.document.nodes.find((n) => n.id === selectedId)?.kind ?? null,
   );
+  const mode = useDesigner((s) => s.document.overview.mode);
+  const categories = mode === "game" ? GAME_CATEGORIES : SOFTWARE_CATEGORIES;
 
   return (
     <div className="flex w-full flex-1 flex-col gap-3 p-2.5">
       {/* Subheader with View Switcher */}
       <div className="flex w-full items-center justify-between px-0.5">
         <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-          Nodes ({CATEGORIES.reduce((acc, c) => acc + c.kinds.length, 0)})
+          Nodes ({categories.reduce((acc, c) => acc + c.kinds.length, 0)})
         </span>
         <div className="flex items-center gap-0.5 rounded-md border border-border/60 bg-muted/40 p-0.5">
           <button
@@ -212,7 +223,7 @@ function PaletteContent() {
         </div>
       </div>
 
-      {CATEGORIES.map((cat) => (
+      {categories.map((cat) => (
         <section key={cat.title} className="flex w-full flex-col gap-1.5">
           <h3 className="px-1 text-[10px] font-semibold tracking-wider text-muted-foreground/80 uppercase">
             {cat.title}

@@ -149,7 +149,7 @@ export function scrubEntityRefs(doc: DesignDocument, gone: ReadonlySet<string>):
 
 /**
  * Removes nodes (with everything nested inside) and edges (plus edges of removed
- * nodes). Stack/convention scopes and entity references to removed nodes are cleared.
+ * nodes). Stack/convention/milestone scopes and entity references to removed nodes are cleared.
  */
 export function removeElements(
   doc: DesignDocument,
@@ -175,6 +175,7 @@ export function removeElements(
       // Scopes must not point at deleted nodes (integrity rule scope.unknown_node).
       stack: doc.stack.map((s) => ({ ...s, scope: s.scope.filter(keepId) })),
       conventions: doc.conventions.map((c) => ({ ...c, scope: c.scope.filter(keepId) })),
+      milestones: doc.milestones.map((m) => ({ ...m, scope: m.scope.filter(keepId) })),
     },
     entities,
   );

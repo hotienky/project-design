@@ -6,6 +6,7 @@ import type {
   DesignDocument,
   DesignEdge,
   DesignNode,
+  Milestone,
   StackItem,
 } from "@/lib/design/schema";
 
@@ -24,6 +25,7 @@ export interface DesignDiff {
   stack: Section<StackItem>;
   conventions: Section<Convention>;
   decisions: Section<Decision>;
+  milestones: Section<Milestone>;
   nodes: Section<DesignNode>;
   edges: Section<DesignEdge>;
   isEmpty: boolean;
@@ -89,13 +91,16 @@ export function diffDesigns(before: DesignDocument, after: DesignDocument): Desi
     stack: diffSection(before.stack, after.stack),
     conventions: diffSection(before.conventions, after.conventions),
     decisions: diffSection(before.decisions, after.decisions),
+    milestones: diffSection(before.milestones, after.milestones),
     nodes: diffSection(before.nodes, after.nodes, ["position", "size"]),
     edges: diffSection(before.edges, after.edges),
     isEmpty: false,
   };
   diff.isEmpty =
     overview.length === 0 &&
-    [diff.stack, diff.conventions, diff.decisions, diff.nodes, diff.edges].every(sectionEmpty);
+    [diff.stack, diff.conventions, diff.decisions, diff.milestones, diff.nodes, diff.edges].every(
+      sectionEmpty,
+    );
   return diff;
 }
 
@@ -135,6 +140,13 @@ export function renderDiffMarkdown(
   block(
     "Decisions",
     render(diff.decisions, (d) => `decision **${d.title}** (${d.status}) [${d.id}]`),
+  );
+  block(
+    "Roadmap",
+    render(
+      diff.milestones,
+      (m) => `milestone **${m.title}**${m.timeframe ? ` (${m.timeframe})` : ""} [${m.id}]`,
+    ),
   );
   block(
     "Components",

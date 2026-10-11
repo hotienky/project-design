@@ -1,4 +1,11 @@
-import type { NodeKind, NodeOfKind } from "@/lib/design/schema";
+import {
+  CONTENT_TYPES,
+  GAME_PRIORITIES,
+  GAME_SYSTEM_CATEGORIES,
+  RESOURCE_TYPES,
+  type NodeKind,
+  type NodeOfKind,
+} from "@/lib/design/schema";
 
 type Data<K extends NodeKind> = NodeOfKind<K>["data"];
 
@@ -77,3 +84,21 @@ export const NOTE_COLOR_NAMES = [
   "pink",
   "gray",
 ] as const satisfies readonly Data<"note">["color"][];
+
+export const GAME_SYSTEM_CATEGORY_OPTIONS =
+  GAME_SYSTEM_CATEGORIES satisfies readonly Data<"system">["category"][];
+
+export const SYSTEM_AUTHORITIES = [
+  "unspecified",
+  "server",
+  "client",
+  "backend",
+  "shared",
+] as const satisfies readonly Data<"system">["authority"][];
+
+export const GAME_PRIORITY_OPTIONS =
+  GAME_PRIORITIES satisfies readonly Data<"system">["priority"][];
+
+export const RESOURCE_TYPE_OPTIONS = RESOURCE_TYPES satisfies readonly Data<"resource">["type"][];
+
+export const CONTENT_TYPE_OPTIONS = CONTENT_TYPES satisfies readonly Data<"content">["type"][];

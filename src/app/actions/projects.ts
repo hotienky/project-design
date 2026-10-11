@@ -4,7 +4,9 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { ashenRealmsDesign } from "@/lib/design/examples/ashen-realms";
 import { teamTasksDesign } from "@/lib/design/examples/team-tasks";
+import type { DesignDocumentInput } from "@/lib/design/schema";
 import { fail, type ActionResult } from "@/app/actions/types";
 import { requirePrincipal } from "@/server/auth/current";
 import { getDb } from "@/server/db/client";
@@ -35,8 +37,27 @@ import { fullstackDesign, microservicesDesign } from "@/lib/design/examples/arch
 const CreateInput = z.object({
   name: Name,
   description: Description.default(""),
-  template: z.enum(["blank", "example", "fullstack", "microservices"]).default("blank"),
+  template: z.enum(["blank", "example", "fullstack", "microservices", "game", "game-example"]).default("blank"),
 });
+
+const BLANK_GAME_DESIGN: DesignDocumentInput = { schemaVersion: 1, overview: { mode: "game" } };
+
+function templateDocument(template: z.infer<typeof CreateInput>["template"]) {
+  switch (template) {
+    case "example":
+      return teamTasksDesign;
+    case "fullstack":
+      return fullstackDesign;
+    case "microservices":
+      return microservicesDesign;
+    case "game":
+      return BLANK_GAME_DESIGN;
+    case "game-example":
+      return ashenRealmsDesign;
+    default:
+      return undefined;
+  }
+}
 
 /** Creates a project and navigates to it. Only returns when something went wrong. */
 export async function createProjectAction(input: unknown): Promise<ActionResult> {
@@ -45,19 +66,11 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
   let slug: string;
   try {
     const { userId } = await requirePrincipal();
-    const document =
-      parsed.data.template === "example"
-        ? teamTasksDesign
-        : parsed.data.template === "fullstack"
-          ? fullstackDesign
-          : parsed.data.template === "microservices"
-            ? microservicesDesign
-            : undefined;
     const project = await createProject(getDb(), {
       ownerId: userId,
       name: parsed.data.name,
       description: parsed.data.description,
-      document,
+      document: templateDocument(parsed.data.template),
     });
     slug = project.slug;
   } catch (error) {

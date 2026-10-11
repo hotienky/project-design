@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Boxes,
   CheckCircle2,
+  Gamepad2,
   Globe,
   Layers,
   Network,
@@ -30,7 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-type TemplateType = "fullstack" | "microservices" | "example" | "blank";
+type TemplateType = "fullstack" | "microservices" | "example" | "blank" | "game" | "game-example";
 
 interface TemplateOption {
   id: TemplateType;
@@ -81,6 +82,23 @@ const TEMPLATES: TemplateOption[] = [
     summary: "Start from an empty board and craft your architecture block by block manually.",
     icon: Boxes,
     blocks: ["Empty Canvas"],
+  },
+  {
+    id: "game",
+    title: "Blank Game Design",
+    badge: "Game Mode",
+    summary: "Dedicated game design mode for gameplay loops, characters, systems, and milestones.",
+    icon: Gamepad2,
+    blocks: ["Game Loop", "Systems", "Milestones"],
+  },
+  {
+    id: "game-example",
+    title: "Ashen Realms (Game)",
+    badge: "Game Example",
+    summary:
+      "Complete Action RPG game design reference with combat mechanics, progression trees, and milestones.",
+    icon: Sparkles,
+    blocks: ["Core Mechanics", "Progression System", "Combat Loop", "Milestones"],
   },
 ];
 
@@ -174,168 +192,168 @@ export function NewProjectDialog() {
                 />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="project-description">Primary Goals / Overview</Label>
-                <Textarea
-                  id="project-description"
-                  placeholder="What business problem does this architecture solve? What are the key non-goals?"
-                  value={description}
-                  rows={3}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
+          <div className="grid gap-1.5">
+            <Label htmlFor="project-description">Primary Goals / Overview</Label>
+            <Textarea
+              id="project-description"
+              placeholder="What business problem does this architecture solve? What are the key non-goals?"
+              value={description}
+              rows={3}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
 
-          {/* STEP 2: Architecture Archetype */}
-          {step === 2 && (
-            <div className="grid gap-3">
-              <DialogHeader className="text-left">
-                <DialogTitle>Architecture Archetype</DialogTitle>
-                <DialogDescription>
-                  Select a starter pattern. Instead of a blank hairball, start with 3–5 high-level
-                  blocks following progressive disclosure.
-                </DialogDescription>
-              </DialogHeader>
+      {/* STEP 2: Architecture Archetype */}
+      {step === 2 && (
+        <div className="grid gap-3">
+          <DialogHeader className="text-left">
+            <DialogTitle>Architecture Archetype</DialogTitle>
+            <DialogDescription>
+              Select a starter pattern. Instead of a blank hairball, start with 3–5 high-level
+              blocks following progressive disclosure.
+            </DialogDescription>
+          </DialogHeader>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[340px] overflow-y-auto pr-1">
-                {TEMPLATES.map((item) => {
-                  const Icon = item.icon;
-                  const isSelected = template === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setTemplate(item.id)}
-                      className={cn(
-                        "group flex flex-col text-left rounded-xl border p-3 transition-all cursor-pointer relative",
-                        isSelected
-                          ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary"
-                          : "border-border/80 hover:border-border hover:bg-muted/50",
-                      )}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <Icon
-                            className={cn(
-                              "size-4",
-                              isSelected ? "text-primary" : "text-muted-foreground",
-                            )}
-                          />
-                          <span className="text-xs font-semibold">{item.title}</span>
-                        </div>
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                          {item.badge}
-                        </span>
-                      </div>
-                      <p className="text-[11px] leading-relaxed text-muted-foreground line-clamp-2">
-                        {item.summary}
-                      </p>
-                      {isSelected && (
-                        <CheckCircle2 className="size-4 text-primary absolute top-2 right-2 shrink-0" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: Big Picture Preview & Confirm */}
-          {step === 3 && (
-            <div className="grid gap-4">
-              <DialogHeader className="text-left">
-                <DialogTitle>Big Picture Preview</DialogTitle>
-                <DialogDescription>
-                  Your canvas will launch with this high-level map (C4 Level 1). All sub-components
-                  and entities are cleanly folded inside.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="rounded-xl border border-border/80 bg-muted/30 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="size-4 text-primary" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-foreground">
-                      {currentTemplate.title}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[340px] overflow-y-auto pr-1">
+            {TEMPLATES.map((item) => {
+              const Icon = item.icon;
+              const isSelected = template === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setTemplate(item.id)}
+                  className={cn(
+                    "group flex flex-col text-left rounded-xl border p-3 transition-all cursor-pointer relative",
+                    isSelected
+                      ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary"
+                      : "border-border/80 hover:border-border hover:bg-muted/50",
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Icon
+                        className={cn(
+                          "size-4",
+                          isSelected ? "text-primary" : "text-muted-foreground",
+                        )}
+                      />
+                      <span className="text-xs font-semibold">{item.title}</span>
+                    </div>
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {item.badge}
                     </span>
                   </div>
-                  <span className="text-xs font-mono text-muted-foreground">
-                    {currentTemplate.blocks.length} macro blocks
-                  </span>
-                </div>
-
-                {/* Macro Blocks Visual Preview */}
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  {currentTemplate.blocks.map((block, idx) => (
-                    <div
-                      key={block}
-                      className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-medium shadow-2xs"
-                    >
-                      <span className="size-2 rounded-full bg-primary/70" />
-                      <span>{block}</span>
-                      {idx < currentTemplate.blocks.length - 1 && (
-                        <ArrowRight className="size-3 text-muted-foreground ml-1" />
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="rounded-lg border border-border/60 bg-background/80 p-2.5 text-xs text-muted-foreground space-y-1">
-                  <p className="font-medium text-foreground">
-                    💡 Progressive Disclosure Guaranteed:
+                  <p className="text-[11px] leading-relaxed text-muted-foreground line-clamp-2">
+                    {item.summary}
                   </p>
-                  <p>• No visual overload on opening: Only high-level containers are visible.</p>
-                  <p>• Double-click any service to zoom inside and explore sub-modules & layers.</p>
-                </div>
+                  {isSelected && (
+                    <CheckCircle2 className="size-4 text-primary absolute top-2 right-2 shrink-0" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3: Big Picture Preview & Confirm */}
+      {step === 3 && (
+        <div className="grid gap-4">
+          <DialogHeader className="text-left">
+            <DialogTitle>Big Picture Preview</DialogTitle>
+            <DialogDescription>
+              Your canvas will launch with this high-level map (C4 Level 1). All sub-components
+              and entities are cleanly folded inside.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-xl border border-border/80 bg-muted/30 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="size-4 text-primary" />
+                <span className="text-xs font-bold uppercase tracking-wider text-foreground">
+                  {currentTemplate.title}
+                </span>
               </div>
+              <span className="text-xs font-mono text-muted-foreground">
+                {currentTemplate.blocks.length} macro blocks
+              </span>
             </div>
-          )}
 
-          {/* Wizard Footer Navigation */}
-          <DialogFooter className="flex items-center justify-between sm:justify-between pt-2 border-t">
-            {step > 1 ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setStep((s) => (s - 1) as 1 | 2)}
-                disabled={pending}
-                className="gap-1"
-              >
-                <ArrowLeft className="size-3.5" /> Back
-              </Button>
-            ) : (
-              <div />
-            )}
+            {/* Macro Blocks Visual Preview */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {currentTemplate.blocks.map((block, idx) => (
+                <div
+                  key={block}
+                  className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-medium shadow-2xs"
+                >
+                  <span className="size-2 rounded-full bg-primary/70" />
+                  <span>{block}</span>
+                  {idx < currentTemplate.blocks.length - 1 && (
+                    <ArrowRight className="size-3 text-muted-foreground ml-1" />
+                  )}
+                </div>
+              ))}
+            </div>
 
-            {step < 3 ? (
-              <Button
-                type="button"
-                size="sm"
-                disabled={step === 1 && !name.trim()}
-                onClick={() => {
-                  if (step === 1 && !name.trim()) return;
-                  setStep((s) => (s + 1) as 2 | 3);
-                }}
-                className="gap-1"
-              >
-                Next <ArrowRight className="size-3.5" />
-              </Button>
-            ) : (
-              <Button
-                type="submit"
-                size="sm"
-                disabled={pending || !name.trim()}
-                className="gap-1.5"
-              >
-                {pending ? "Generating architecture…" : "Create & Launch Canvas"}
-                <Sparkles className="size-3.5" />
-              </Button>
-            )}
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <div className="rounded-lg border border-border/60 bg-background/80 p-2.5 text-xs text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground">
+                💡 Progressive Disclosure Guaranteed:
+              </p>
+              <p>• No visual overload on opening: Only high-level containers are visible.</p>
+              <p>• Double-click any service to zoom inside and explore sub-modules & layers.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wizard Footer Navigation */}
+      <DialogFooter className="flex items-center justify-between sm:justify-between pt-2 border-t">
+        {step > 1 ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setStep((s) => (s - 1) as 1 | 2)}
+            disabled={pending}
+            className="gap-1"
+          >
+            <ArrowLeft className="size-3.5" /> Back
+          </Button>
+        ) : (
+          <div />
+        )}
+
+        {step < 3 ? (
+          <Button
+            type="button"
+            size="sm"
+            disabled={step === 1 && !name.trim()}
+            onClick={() => {
+              if (step === 1 && !name.trim()) return;
+              setStep((s) => (s + 1) as 2 | 3);
+            }}
+            className="gap-1"
+          >
+            Next <ArrowRight className="size-3.5" />
+          </Button>
+        ) : (
+          <Button
+            type="submit"
+            size="sm"
+            disabled={pending || !name.trim()}
+            className="gap-1.5"
+          >
+            {pending ? "Generating architecture…" : "Create & Launch Canvas"}
+            <Sparkles className="size-3.5" />
+          </Button>
+        )}
+      </DialogFooter>
+    </form>
+      </DialogContent >
+    </Dialog >
   );
 }

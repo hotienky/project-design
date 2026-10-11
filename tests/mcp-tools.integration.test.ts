@@ -5,6 +5,7 @@ import { DELETE, GET, POST } from "@/app/api/mcp/route";
 import { renderBrief } from "@/lib/design/brief";
 import { teamTasksDesign } from "@/lib/design/examples/team-tasks";
 import { parseDesign } from "@/lib/design/integrity";
+import { NODE_KINDS } from "@/lib/design/schema";
 import { getDb } from "@/server/db/client";
 import { createProject, getProject, saveDraft } from "@/server/services/projects";
 import { createToken } from "@/server/services/tokens";
@@ -75,7 +76,7 @@ describe("MCP tools", () => {
     const { client } = await seed();
 
     const schema = json(await call(client, "get_design_schema"));
-    expect(Object.keys(schema.nodeKinds)).toHaveLength(10);
+    expect(Object.keys(schema.nodeKinds)).toHaveLength(NODE_KINDS.length);
     expect(schema.guide).toContain("Containment");
     expect(schema.jsonSchema.type).toBe("object");
 

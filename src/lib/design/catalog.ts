@@ -56,7 +56,7 @@ export const NODE_KIND_META: Record<NodeKind, NodeKindMeta> = {
     label: "Entity",
     icon: "Table2",
     container: false,
-    parents: [null, "datastore", "layer", "service"],
+    parents: [null, "datastore", "layer", "service", "system"],
     defaultSize: { width: 208, height: 54 },
     description:
       "A data model with typed fields. Inside a datastore it is a persisted table/collection; " +
@@ -117,9 +117,69 @@ export const NODE_KIND_META: Record<NodeKind, NodeKindMeta> = {
     label: "Note",
     icon: "StickyNote",
     container: false,
-    parents: [null, "service", "layer", "datastore"],
+    parents: [null, "service", "layer", "datastore", "system"],
     defaultSize: { width: 208, height: 112 },
     description: "A free-text annotation. Read it as guidance; it generates nothing by itself.",
+  },
+  loop: {
+    label: "Gameplay loop",
+    icon: "Repeat",
+    container: false,
+    parents: [null],
+    defaultSize: { width: 208, height: 54 },
+    description:
+      "A gameplay loop the player repeats (e.g. combat 5–30 s, expedition 15–30 min, " +
+      "progression over weeks): data.duration, data.motivation and data.steps in order. drives " +
+      "edges point at the systems and mechanics the loop exercises, or at a nested inner loop. " +
+      "Design context: nothing is generated from a loop itself.",
+  },
+  system: {
+    label: "Game system",
+    icon: "Cog",
+    container: true,
+    parents: [null],
+    defaultSize: { width: 520, height: 320 },
+    description:
+      "A game system (combat, inventory, loot, progression, enemy AI, economy, multiplayer…). " +
+      "Its mechanics, resources, content tables and data entities sit inside it. data.rules are " +
+      "hard design rules, data.parameters are tuning values (starting points, not final " +
+      "balance), data.formulas are the system's math, data.authority says who owns its state in " +
+      "multiplayer, data.priority is mvp / launch / later. Implement it as one feature module " +
+      "with its domain logic kept pure and testable; produces/consumes/triggers/modifies edges " +
+      "say how it works with other systems, depends_on edges give the build order.",
+  },
+  mechanic: {
+    label: "Mechanic",
+    icon: "Zap",
+    container: false,
+    parents: ["system"],
+    defaultSize: { width: 208, height: 54 },
+    description:
+      "One mechanic or feature of a system (dodge, damage calculation, personal loot, weapon " +
+      "mastery…): data.trigger starts it, data.states are its states or phases in order, " +
+      "data.rules, data.parameters and data.formulas define it exactly.",
+  },
+  resource: {
+    label: "Resource",
+    icon: "Gem",
+    container: false,
+    parents: [null, "system"],
+    defaultSize: { width: 208, height: 54 },
+    description:
+      "A quantity the game tracks: a stat (health, stamina), attribute (strength), currency " +
+      "(gold), material, item or experience. data.initial/min/max/regen are its values. Systems " +
+      "and mechanics with produces edges are its sources, consumes edges are its sinks.",
+  },
+  content: {
+    label: "Content table",
+    icon: "TableProperties",
+    container: false,
+    parents: [null, "system"],
+    defaultSize: { width: 208, height: 54 },
+    description:
+      "Authored content definitions as a table (enemy archetypes, rarity tiers, boss phases, " +
+      "weapon families, difficulty scaling…): data.columns and data.rows. Generate these as " +
+      "data assets (e.g. ScriptableObjects, JSON) with stable ids, not as hard-coded logic.",
   },
 };
 
@@ -137,10 +197,10 @@ export interface EdgeKindMeta {
 export const EDGE_KIND_META: Record<EdgeKind, EdgeKindMeta> = {
   depends_on: {
     label: "depends on",
-    from: ["service", "layer", "module"],
-    to: ["service", "layer", "module"],
+    from: ["service", "layer", "module", "system", "mechanic"],
+    to: ["service", "layer", "module", "system", "mechanic"],
     description:
-      "Source code imports/uses the target. Between layers it declares an allowed dependency " +
+      "Source code imports/uses the target; between game systems it means the target must be built first. Between layers it declares an allowed dependency " +
       "direction; never generate imports that go against it.",
   },
   calls: {
@@ -162,7 +222,7 @@ export const EDGE_KIND_META: Record<EdgeKind, EdgeKindMeta> = {
   },
   accesses: {
     label: "accesses",
-    from: ["service", "layer", "module"],
+    from: ["service", "layer", "module", "system", "mechanic"],
     to: ["datastore", "entity"],
     description: "Source reads and/or writes the target store or entity (data.mode).",
   },
@@ -180,9 +240,10 @@ export const EDGE_KIND_META: Record<EdgeKind, EdgeKindMeta> = {
   },
   uses: {
     label: "uses",
-    from: ["service", "module"],
-    to: ["integration"],
-    description: "Source calls the third-party integration (data.purpose says why).",
+    from: ["service", "module", "system", "mechanic"],
+    to: ["integration", "content"],
+    description:
+      "Source calls the third-party integration, or reads the content table (data.purpose says why).",
   },
   relation: {
     label: "relation",
@@ -195,14 +256,55 @@ export const EDGE_KIND_META: Record<EdgeKind, EdgeKindMeta> = {
   interacts: {
     label: "interacts",
     from: ["actor"],
-    to: ["service", "api"],
+    to: ["service", "api", "loop", "system"],
     description: "An actor uses the target (data.via, e.g. 'browser', 'mobile app').",
+  },
+  drives: {
+    label: "drives",
+    from: ["loop"],
+    to: ["loop", "system", "mechanic"],
+    description:
+      "The loop exercises the target system or mechanic; loop → loop means the target is an " +
+      "inner loop repeated within the source.",
+  },
+  produces: {
+    label: "produces",
+    from: ["system", "mechanic", "content"],
+    to: ["resource"],
+    description: "Source is a source of the resource: grants, drops or regenerates it (data.rate).",
+  },
+  consumes: {
+    label: "consumes",
+    from: ["system", "mechanic"],
+    to: ["resource"],
+    description: "Source is a sink of the resource: spends or removes it (data.amount).",
+  },
+  triggers: {
+    label: "triggers",
+    from: ["system", "mechanic"],
+    to: ["system", "mechanic"],
+    description:
+      "Gameplay event flow: when data.event happens in the source, the target reacts (e.g. " +
+      "enemy defeated → loot roll). Implement as a typed event, not a direct call.",
+  },
+  modifies: {
+    label: "modifies",
+    from: ["system", "mechanic", "resource", "content"],
+    to: ["system", "mechanic", "resource"],
+    description:
+      "Source changes the target's values or behaviour (data.effect), e.g. equipment modifies " +
+      "stats, strength modifies damage.",
   },
 };
 
 /** Edge kinds allowed between two node kinds, most likely first (used to preselect on connect). */
 export function allowedEdgeKinds(from: NodeKind, to: NodeKind): EdgeKind[] {
   const order: EdgeKind[] = [
+    "drives",
+    "produces",
+    "consumes",
+    "triggers",
+    "modifies",
     "relation",
     "interacts",
     "exposes",

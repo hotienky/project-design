@@ -26,6 +26,11 @@ const GUIDE = `# How to read a design
   a \`list\`) or inline \`fields\`.
 - **Layers.** A \`depends_on\` edge between layers declares an allowed dependency direction. Do not
   generate imports that go against it.
+- **Game designs** (\`overview.mode\` "game"). \`loop\`s drive \`system\`s; each system holds its
+  \`mechanic\`s, \`resource\`s and \`content\` tables. produces/consumes edges are a resource's
+  sources and sinks, triggers edges are gameplay events, modifies edges change values,
+  depends_on edges give the build order. Parameters are tuning starting points; rules and
+  formulas are exact. \`milestones\` is the roadmap; build in that order.
 - **Versions.** The *draft* is the working copy; *published versions* are immutable snapshots. Pin
   a version number when you want a stable target.
 - Report progress with set_component_status so the designer sees it on the canvas.

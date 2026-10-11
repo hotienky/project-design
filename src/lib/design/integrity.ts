@@ -41,6 +41,7 @@ export function checkIntegrity(doc: DesignDocument): Issue[] {
     ["stack", doc.stack],
     ["conventions", doc.conventions],
     ["decisions", doc.decisions],
+    ["milestones", doc.milestones],
   ] as const) {
     const seen = new Set<string>();
     for (const item of items) {
@@ -48,7 +49,7 @@ export function checkIntegrity(doc: DesignDocument): Issue[] {
       seen.add(item.id);
     }
   }
-  for (const item of [...doc.stack, ...doc.conventions]) {
+  for (const item of [...doc.stack, ...doc.conventions, ...doc.milestones]) {
     for (const id of item.scope) {
       if (!nodes.has(id))
         err("scope.unknown_node", `"${item.id}" is scoped to unknown node "${id}"`);

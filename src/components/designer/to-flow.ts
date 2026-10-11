@@ -217,6 +217,14 @@ export function edgeCaption(edge: DesignEdge, nodes: ReadonlyMap<string, DesignN
           : null;
       return channel ? `${base} · ${channel.name}` : base;
     }
+    case "produces":
+      return edge.data.rate ? `${base} · ${edge.data.rate}` : base;
+    case "consumes":
+      return edge.data.amount ? `${base} · ${edge.data.amount}` : base;
+    case "triggers":
+      return edge.data.event ? `${base} · ${edge.data.event}` : base;
+    case "modifies":
+      return edge.data.effect ? `${base} · ${edge.data.effect}` : base;
     default:
       return base;
   }

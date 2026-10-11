@@ -27,6 +27,7 @@ const TABS = [
   { segment: "stack", label: "Stack" },
   { segment: "conventions", label: "Conventions" },
   { segment: "decisions", label: "Decisions" },
+  { segment: "roadmap", label: "Roadmap" },
   { segment: "brief", label: "Brief" },
   { segment: "versions", label: "Versions" },
 ] as const;

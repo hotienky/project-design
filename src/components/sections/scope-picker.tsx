@@ -25,14 +25,16 @@ export function ScopePicker({
   value,
   onChange,
   label = "Applies to",
+  kinds = SCOPE_KINDS,
 }: {
   value: string[];
   onChange: (ids: string[]) => void;
   label?: string;
+  kinds?: readonly string[];
 }) {
   const document = useDesigner((s) => s.document);
   const [open, setOpen] = useState(false);
-  const nodes = document.nodes.filter((n) => SCOPE_KINDS.includes(n.kind));
+  const nodes = document.nodes.filter((n) => kinds.includes(n.kind));
   const index = indexDesign(document);
   const toggle = (id: string) =>
     onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);

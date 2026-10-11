@@ -24,6 +24,11 @@ const STYLE: Record<EdgeKind, { stroke: string; width: number; dash?: string }> 
   uses: { stroke: "#ec4899", width: 1.5 },
   relation: { stroke: "#f59e0b", width: 1.5 },
   interacts: { stroke: "#14b8a6", width: 1.25 },
+  drives: { stroke: "#f43f5e", width: 1.5, dash: "6 4" },
+  produces: { stroke: "#84cc16", width: 1.75 },
+  consumes: { stroke: "#ef4444", width: 1.75 },
+  triggers: { stroke: "#f59e0b", width: 1.5, dash: "5" },
+  modifies: { stroke: "#d946ef", width: 1.5, dash: "2 4" },
 };
 
 const VIOLATION = "#ef4444";

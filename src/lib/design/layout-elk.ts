@@ -31,6 +31,11 @@ export const LAYOUT_EDGE_WEIGHT: Record<EdgeKind, number> = {
   uses: 5,
   interacts: 5,
   relation: 5,
+  drives: 10,
+  produces: 8,
+  consumes: 8,
+  triggers: 8,
+  modifies: 5,
 };
 
 /**
