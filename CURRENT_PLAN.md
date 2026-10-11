@@ -732,7 +732,8 @@ Tests (`tests/rest.integration.test.ts`): call the exported handlers directly wi
   - Spacer.
   - `Validate` button with a count badge (errors red, else warnings amber) that toggles the validation panel.
   - `Publish` (dialog: label, notes → `publishVersionAction`, toast "Published v4").
-  - `Export ▾` (Design JSON, Markdown brief).
+  - `Export` (dialog: diagram as PNG / SVG / PDF / MMD diagram-as-code with live preview
+    and background choice, plus Design JSON, Markdown brief and SQL DDL).
   - `Connect agent` (dialog with the §9.7 snippets and a link to `/settings`).
 - **Tabs** (links, not client tabs): Canvas · Overview · Stack · Conventions · Decisions · Brief · Versions.
 - `DesignerStoreProvider` (`store-provider.tsx`, client) holds `useState(() => createDesignerStore(initial))`, a React context, and `useDesigner(selector)` built on `useStore(store, selector)`. It also provides `useTemporal()` for undo/redo state, `useProjectMeta()` (`{ name, slug, description }` from the loader; the Brief tab needs it) and `saveNow()` from `<Autosave>`.

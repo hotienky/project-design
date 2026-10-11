@@ -16,8 +16,8 @@ export interface CanvasActions {
   /** Delete the selection, asking first when containers with children are included. */
   deleteSelection(): void;
   fitView(): void;
-  /** Arrange what the current view shows as a tree, then frame it. */
-  tidyLayout(): void;
+  /** Arrange what the current view shows with ELK layered flow, then frame it. */
+  tidyLayout(options?: { direction?: "RIGHT" | "DOWN" }): void;
   zoomIn(): void;
   zoomOut(): void;
   resetZoom(): void;
@@ -32,7 +32,7 @@ const noop: CanvasActions = {
   focus() {},
   deleteSelection() {},
   fitView() {},
-  tidyLayout() {},
+  tidyLayout(_opts) {},
   zoomIn() {},
   zoomOut() {},
   resetZoom() {},
@@ -69,7 +69,7 @@ export function useCanvasActions(): CanvasActions {
       focus: (t) => ref.current.focus(t),
       deleteSelection: () => ref.current.deleteSelection(),
       fitView: () => ref.current.fitView(),
-      tidyLayout: () => ref.current.tidyLayout(),
+      tidyLayout: (opts) => ref.current.tidyLayout(opts),
       zoomIn: () => ref.current.zoomIn(),
       zoomOut: () => ref.current.zoomOut(),
       resetZoom: () => ref.current.resetZoom(),

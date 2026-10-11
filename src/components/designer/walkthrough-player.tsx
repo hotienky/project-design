@@ -106,14 +106,14 @@ export function WalkthroughPlayer() {
     <div
       role="region"
       aria-label="Collapsed walkthrough transport bar"
-      className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-150"
+      className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 max-w-[calc(100vw-1rem)] animate-in fade-in slide-in-from-bottom-2 duration-150"
     >
-      <div className="flex h-9 items-center gap-2 rounded-full border border-primary/30 bg-background/95 px-3 shadow-xl backdrop-blur-md">
+      <div className="flex h-9 items-center gap-1.5 sm:gap-2 rounded-full border border-primary/30 bg-background/95 px-2.5 sm:px-3 shadow-xl backdrop-blur-md overflow-x-auto no-scrollbar">
         <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
           <Sparkles className="size-3" />
         </span>
 
-        <div className="flex items-center gap-1.5 truncate max-w-[220px]">
+        <div className="flex items-center gap-1.5 truncate max-w-[130px] sm:max-w-[220px]">
           <span className="font-mono text-xs font-semibold text-foreground">
             {current.index}/{steps.length}
           </span>

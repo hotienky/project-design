@@ -140,7 +140,7 @@ function levelNodes(
       position,
       ...(parentId ? { parentId } : {}),
       // A focused module sits at a made-up position: there is nothing to drag it to.
-      ...(view.focus?.kind === "module" ? { draggable: false } : {}),
+      ...(view.focus?.kind === "module" && n.id === view.focus.id ? { draggable: false } : {}),
       data: { node: n, status },
       ...(container ? { width: nodeSize(n).width, height: nodeSize(n).height } : {}),
       selected: selected.has(n.id),

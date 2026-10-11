@@ -983,19 +983,28 @@ function Flow({ wide }: { wide: boolean }) {
                 nodeColor={(n) => KIND_STYLE[n.data.node.kind]?.hex ?? "#888"}
               />
             )}
-            {/* Top-center: Perspective Switch, Flow Filter & Level breadcrumbs */}
-            <Panel position="top-center" className="flex items-center gap-2">
-              <PerspectiveSwitch />
-              <FlowTagFilter />
-              {viewMode === "levels" && (
+            {/* Top-left: Level navigation breadcrumb */}
+            {viewMode === "levels" && (
+              <Panel position="top-left" className="m-3">
                 <LevelBreadcrumb focusId={view ? (view.focus?.id ?? null) : focusId} />
-              )}
-              {readOnly && (
-                <span className="flex h-7 items-center gap-1.5 rounded-lg border bg-background/90 px-2 text-xs font-medium text-muted-foreground shadow-xs">
-                  <Lock className="size-3.5" aria-hidden />
-                  Read-only
-                </span>
-              )}
+              </Panel>
+            )}
+
+            {/* Top-center: Unified View Options Pill */}
+            <Panel position="top-center" className="m-3">
+              <div className="flex h-9 items-center gap-1.5 rounded-full border border-border/80 bg-background/95 p-1 shadow-xs backdrop-blur-md">
+                <PerspectiveSwitch />
+                <FlowTagFilter />
+                {readOnly && (
+                  <>
+                    <div className="h-4 w-px bg-border/60" />
+                    <span className="flex h-6 items-center gap-1 rounded-full bg-muted/80 px-2 text-[11px] font-medium text-muted-foreground">
+                      <Lock className="size-3" aria-hidden />
+                      Read-only
+                    </span>
+                  </>
+                )}
+              </div>
             </Panel>
 
             {/* Bottom-center: Ergonomic Floating Dock */}

@@ -136,6 +136,25 @@ describe("MCP tools", () => {
     expect(seqDiagram.startsWith("sequenceDiagram")).toBe(true);
     expect(seqDiagram).toContain("participant");
 
+    const agentsMd = raw(await call(client, "get_agent_rules"));
+    expect(agentsMd).toContain("# Team Tasks — Coding Agent Guidelines & Architecture Rules");
+    expect(agentsMd).toContain("Strict Layer Boundaries (Dependency Matrix)");
+
+    const cursorRules = raw(await call(client, "get_agent_rules", { format: "cursorrules" }));
+    expect(cursorRules).toContain("# Cursor Rules for Team Tasks");
+
+    const mcpConfig = json(await call(client, "get_agent_rules", { format: "mcp.json" }));
+    expect(mcpConfig.mcpServers["project-design"]).toBeDefined();
+
+    const scaffoldTree = raw(await call(client, "get_project_scaffold"));
+    expect(scaffoldTree).toContain(". (project root)");
+    expect(scaffoldTree).toContain("AGENTS.md");
+    expect(scaffoldTree).toContain("apps/");
+
+    const scaffoldSummary = json(await call(client, "get_project_scaffold", { format: "summary" }));
+    expect(scaffoldSummary.fileCount).toBeGreaterThan(10);
+    expect(scaffoldSummary.layout).toBe("monorepo");
+
     const resolved = json(
       await call(client, "resolve_file_to_component", {
         filePath: "apps/api/src/domain/task.ts",
@@ -206,6 +225,25 @@ describe("MCP tools", () => {
       api: "api_rest",
     });
     expect(restOk.isError).toBeFalsy();
+    await client.close();
+  });
+
+  it("reports an unscaffoldable design as a tool error, not a protocol error", async () => {
+    const { client } = await seed();
+    const single = await createProject(db, {
+      ownerId: (await testUser()).id,
+      name: "Single",
+      document: {
+        ...teamTasksDesign,
+        overview: {
+          ...teamTasksDesign.overview,
+          repository: { layout: "single-package", packageManager: "npm" },
+        },
+      },
+    });
+    const res = await call(client, "get_project_scaffold", { project: single.slug });
+    expect(res.isError).toBe(true);
+    expect(raw(res)).toContain("Single-package layout cannot scaffold");
     await client.close();
   });
 

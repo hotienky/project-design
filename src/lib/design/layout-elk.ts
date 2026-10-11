@@ -62,14 +62,29 @@ async function getElk(): Promise<{ layout: (g: unknown) => Promise<unknown> }> {
   return elkInstance;
 }
 
+export type ElkLayoutDirection = "RIGHT" | "DOWN";
+
+export interface ElkLayoutOptions {
+  direction?: ElkLayoutDirection;
+  nodeSpacing?: number;
+  layerSpacing?: number;
+  crossingMinimization?: "LAYER_SWEEP" | "MEDIAN_LAYER_SWEEP";
+  thoroughness?: number;
+}
+
+export interface ElkLayoutBox extends LayoutBox {
+  kind?: DesignNode["kind"];
+}
+
 /**
  * Top-left positions for `boxes` along `links` (source → target pairs).
  * Drop-in async replacement for `treePositions`: same input order in,
  * deterministic positions out, no overlaps.
  */
 export async function elkPositions(
-  boxes: LayoutBox[],
-  links: [string, string][],
+  boxes: ElkLayoutBox[],
+  links: ([string, string] | [string, string, number])[],
+  options: ElkLayoutOptions = {},
 ): Promise<Map<string, Point>> {
   const positions = new Map<string, Point>();
   if (boxes.length === 0) return positions;
@@ -78,15 +93,39 @@ export async function elkPositions(
     return positions;
   }
 
+  const direction = options.direction ?? "RIGHT";
+  const nodeSpacing = options.nodeSpacing ?? 48;
+  const layerSpacing = options.layerSpacing ?? (direction === "DOWN" ? 120 : 160);
+
   const byId = new Map(boxes.map((b) => [b.id, b]));
   const seen = new Set<string>();
-  const edges: { id: string; sources: string[]; targets: string[] }[] = [];
+  const edges: {
+    id: string;
+    sources: string[];
+    targets: string[];
+    layoutOptions?: Record<string, string>;
+  }[] = [];
   let n = 0;
-  for (const [s, t] of links) {
+  for (const item of links) {
+    const s = item[0];
+    const t = item[1];
+    const weight = item[2];
     const key = s + "::" + t;
     if (s === t || !byId.has(s) || !byId.has(t) || seen.has(key)) continue;
     seen.add(key);
-    edges.push({ id: "e" + n++, sources: [s], targets: [t] });
+    edges.push({
+      id: "e" + n++,
+      sources: [s],
+      targets: [t],
+      ...(weight !== undefined
+        ? {
+            layoutOptions: {
+              "elk.priority": String(weight),
+              "elk.layered.priority.direction": String(weight),
+            },
+          }
+        : {}),
+    });
   }
 
   const elk = await getElk();
@@ -94,16 +133,31 @@ export async function elkPositions(
     id: "root",
     layoutOptions: {
       "elk.algorithm": "layered",
-      "elk.direction": "RIGHT",
+      "elk.direction": direction,
       "elk.padding": "[0,0,0,0]",
-      "elk.spacing.nodeNode": "40",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "144",
-      "elk.layered.spacing.edgeNodeBetweenLayers": "40",
-      "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
-      "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
-      "elk.layered.considerModelOrder.strategy": "NODES_AND_CHOICE",
+      "elk.spacing.nodeNode": String(nodeSpacing),
+      "elk.layered.spacing.nodeNodeBetweenLayers": String(layerSpacing),
+      "elk.layered.spacing.edgeNodeBetweenLayers": "48",
+      "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+      "elk.layered.nodePlacement.favorStraightEdges": "true",
+      "elk.layered.crossingMinimization.strategy": options.crossingMinimization ?? "LAYER_SWEEP",
+      "elk.layered.crossingMinimization.greedySwitch": "true",
+      "elk.layered.thoroughness": String(options.thoroughness ?? 15),
+      "elk.layered.cycleBreaking.strategy": "GREEDY",
+      "elk.alignment": "CENTER",
     },
-    children: boxes.map((b) => ({ id: b.id, width: b.width, height: b.height })),
+    children: boxes.map((b) => {
+      const childOpts: Record<string, string> = {};
+      if (b.kind === "actor") {
+        childOpts["elk.layered.layering.layerConstraint"] = "FIRST";
+      }
+      return {
+        id: b.id,
+        width: b.width,
+        height: b.height,
+        ...(Object.keys(childOpts).length > 0 ? { layoutOptions: childOpts } : {}),
+      };
+    }),
     edges,
   };
 
@@ -120,6 +174,13 @@ export async function elkPositions(
   return positions;
 }
 
+export interface ArrangeLayoutElkOptions {
+  collapsed?: boolean;
+  direction?: ElkLayoutDirection;
+  nodeSpacing?: number;
+  layerSpacing?: number;
+}
+
 /**
  * Async ELK version of `arrangeLayout`: lays out the inside of `rootId`
  * (null = top level) along the flow, deepest containers first, resizing
@@ -128,8 +189,9 @@ export async function elkPositions(
 export async function arrangeLayoutElk(
   doc: DesignDocument,
   rootId: string | null,
-  { collapsed = false }: { collapsed?: boolean } = {},
+  options: ArrangeLayoutElkOptions = {},
 ): Promise<DesignDocument> {
+  const { collapsed = false, direction = "RIGHT", nodeSpacing, layerSpacing } = options;
   const nodes = new Map(doc.nodes.map((n) => [n.id, n]));
   const sizeOf = (n: DesignNode) =>
     collapsed && NODE_KIND_META[n.kind].container ? summarySize() : nodeSize(n);
@@ -143,18 +205,21 @@ export async function arrangeLayoutElk(
     return n && n.parentId === parentId ? n.id : null;
   };
 
+  const edgeWeight = (e: DesignEdge) => LAYOUT_EDGE_WEIGHT[e.kind] ?? 5;
+
   const arrange = async (parentId: string | null) => {
     const kids = doc.nodes.filter((n) => n.parentId === parentId).map((n) => nodes.get(n.id)!);
     if (kids.length === 0) return;
     const links = doc.edges
-      .map((e): [string | null, string | null] => {
+      .map((e): [string | null, string | null, number] => {
         const [s, t] = layoutLinkFor(e);
-        return [lift(s, parentId), lift(t, parentId)];
+        return [lift(s, parentId), lift(t, parentId), edgeWeight(e)];
       })
-      .filter((l): l is [string, string] => l[0] !== null && l[1] !== null);
+      .filter((l): l is [string, string, number] => l[0] !== null && l[1] !== null);
     const positions = await elkPositions(
-      kids.map((n) => ({ id: n.id, ...sizeOf(n) })),
+      kids.map((n) => ({ id: n.id, kind: n.kind, ...sizeOf(n) })),
       links,
+      { direction, nodeSpacing, layerSpacing },
     );
     const inset = parentId ? { x: CONTAINER_PAD, y: CONTAINER_HEADER } : { x: 0, y: 0 };
     let right = 0;
@@ -168,9 +233,12 @@ export async function arrangeLayoutElk(
     }
     if (parentId) {
       const parent = nodes.get(parentId)!;
+      const minSize = NODE_KIND_META[parent.kind].defaultSize;
+      const width = snap(Math.max(minSize.width, right + CONTAINER_PAD));
+      const height = snap(Math.max(minSize.height, bottom + CONTAINER_PAD));
       nodes.set(parentId, {
         ...parent,
-        size: { width: right + CONTAINER_PAD, height: bottom + CONTAINER_PAD },
+        size: { width, height },
       });
     }
   };

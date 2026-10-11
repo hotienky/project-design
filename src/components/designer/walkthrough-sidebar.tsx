@@ -477,7 +477,7 @@ export function WalkthroughSidebar({ wide }: { wide: boolean }) {
   // Mobile / Narrow screen drawer
   return (
     <Sheet open={walkthroughActive} onOpenChange={(open) => !open && stopWalkthrough()}>
-      <SheetContent side="right" className="w-96 gap-0 p-0 sm:max-w-sm">
+      <SheetContent side="right" className="w-full max-w-[88vw] sm:max-w-sm gap-0 p-0">
         <SheetTitle className="sr-only">Architecture Tour Guide</SheetTitle>
         <SheetDescription className="sr-only">
           Interactive guided walkthrough of the software architecture.

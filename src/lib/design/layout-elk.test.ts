@@ -116,6 +116,27 @@ describe("arrangeLayoutElk", () => {
     const top = after.nodes.filter((n) => n.parentId === null);
     expect(new Set(top.map((n) => n.position.y)).size).toBeGreaterThan(1);
   });
+
+  it("arranges with DOWN direction placing sources above targets", async () => {
+    const after = await arrangeLayoutElk(doc(), null, { direction: "DOWN" });
+    expect(collisions(after)).toEqual([]);
+    const y = (id: string) => after.nodes.find((n) => n.id === id)!.position.y;
+    // Actor calls web UI, web UI calls API
+    expect(y("act_member")).toBeLessThan(y("svc_web"));
+    expect(y("svc_web")).toBeLessThan(y("api_rest"));
+    // API service reaches queue and notifier
+    expect(y("que_events")).toBeLessThan(y("svc_notifier"));
+    expect(y("svc_notifier")).toBeLessThan(y("int_email"));
+  });
+
+  it("pins actor nodes to the first layer constraint", async () => {
+    const after = await arrangeLayoutElk(doc(), null);
+    const actorX = after.nodes.find((n) => n.kind === "actor")!.position.x;
+    // Actor is at the leftmost column
+    for (const n of after.nodes.filter((x) => x.parentId === null && x.kind !== "note")) {
+      expect(actorX).toBeLessThanOrEqual(n.position.x);
+    }
+  });
 });
 
 describe("needsAutoLayout", () => {

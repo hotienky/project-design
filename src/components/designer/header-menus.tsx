@@ -21,8 +21,8 @@ export function ExportMenu() {
   const [diagramOpen, setDiagramOpen] = useState(false);
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={() => setDiagramOpen(true)}>
-        <Download /> Export
+      <Button variant="ghost" size="sm" onClick={() => setDiagramOpen(true)} title="Export design">
+        <Download className="size-3.5" /> <span className="hidden sm:inline">Export</span>
       </Button>
       <ExportDiagramDialog open={diagramOpen} onOpenChange={setDiagramOpen} />
     </>
@@ -35,8 +35,8 @@ export function ConnectDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm">
-          <PlugZap /> Connect agent
+        <Button variant="ghost" size="sm" title="Connect a coding agent">
+          <PlugZap className="size-3.5" /> <span className="hidden sm:inline">Connect</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">

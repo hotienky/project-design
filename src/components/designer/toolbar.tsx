@@ -1,10 +1,13 @@
 "use client";
 
 import {
+  ArrowDown,
+  ArrowRight,
   Crosshair,
   Database,
   Layers,
   LayoutGrid,
+  Loader2,
   Map as MapIcon,
   Maximize,
   Minus,
@@ -16,12 +19,20 @@ import {
   ShieldCheck,
   Sparkles,
   Undo2,
+  Wand2,
 } from "lucide-react";
 import { useEffect } from "react";
 
 import { useCanvasActions } from "@/components/designer/canvas-actions";
 import { useDesigner, useTemporal } from "@/components/designer/store-provider";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { validateDesign } from "@/lib/design/validate";
 import { cn } from "@/lib/utils";
@@ -82,6 +93,7 @@ export function Toolbar() {
   const rightOpen = useCanvasUi((s) => s.rightSidebarOpen);
   const focusMode = useCanvasUi((s) => s.focusMode);
   const collapseDatastores = useCanvasUi((s) => s.collapseDatastores);
+  const layoutBusy = useCanvasUi((s) => s.layoutBusy);
 
   // Issues count for validation badge
   const issues = validateDesign(document, { layout: viewMode });
@@ -117,6 +129,15 @@ export function Toolbar() {
           e.preventDefault();
           actions.fitView();
         }
+      } else if (e.key === "l" || e.key === "L") {
+        if (!e.metaKey && !e.ctrlKey) {
+          e.preventDefault();
+          if (e.shiftKey) {
+            actions.tidyLayout({ direction: "DOWN" });
+          } else {
+            actions.tidyLayout({ direction: "RIGHT" });
+          }
+        }
       } else if (e.key === "t" || e.key === "T") {
         if (!e.metaKey && !e.ctrlKey) {
           e.preventDefault();
@@ -137,7 +158,7 @@ export function Toolbar() {
     <div
       role="toolbar"
       aria-label="Canvas control dock"
-      className="flex items-center divide-x divide-border/60 overflow-hidden rounded-xl border border-border/80 bg-background/95 shadow-md backdrop-blur-md transition-all hover:border-border hover:shadow-lg"
+      className="flex max-w-[calc(100vw-1.5rem)] items-center divide-x divide-border/60 overflow-x-auto no-scrollbar rounded-xl border border-border/80 bg-background/95 shadow-md backdrop-blur-md transition-all hover:border-border hover:shadow-lg"
     >
       {/* Left panel toggle */}
       <Tool
@@ -177,7 +198,7 @@ export function Toolbar() {
       </div>
 
       {/* Flow focus & datastore density controls */}
-      <div className="flex items-center divide-x divide-border/50">
+      <div className="hidden sm:flex items-center divide-x divide-border/50">
         <Tool
           label={
             focusMode
@@ -215,6 +236,51 @@ export function Toolbar() {
         </Tool>
       </div>
 
+      {/* Auto-Layout (ELK) */}
+      <div className="flex items-center">
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="relative size-8.5 rounded-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                  disabled={readOnly || layoutBusy}
+                  aria-label="Auto-arrange layout with ELK (L)"
+                >
+                  {layoutBusy ? (
+                    <Loader2 className="size-4 animate-spin text-primary" />
+                  ) : (
+                    <Wand2 className="size-4 text-primary" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="top">Auto-arrange layout with ELK (L)</TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent side="top" align="center" className="w-56">
+            <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">
+              ELK Flow Layout
+            </DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => actions.tidyLayout({ direction: "RIGHT" })}>
+              <ArrowRight className="mr-2 size-4 text-sky-500" />
+              <div className="flex flex-col">
+                <span className="font-medium text-xs">Tidy Flow (Left → Right)</span>
+                <span className="text-[10px] text-muted-foreground">Dependency flow (L)</span>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => actions.tidyLayout({ direction: "DOWN" })}>
+              <ArrowDown className="mr-2 size-4 text-emerald-500" />
+              <div className="flex flex-col">
+                <span className="font-medium text-xs">Tidy Layered (Top ↓ Bottom)</span>
+                <span className="text-[10px] text-muted-foreground">C4 layered model (⇧L)</span>
+              </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       {/* Tools & Panels */}
       <div className="flex items-center divide-x divide-border/50">
         <Tool
@@ -235,13 +301,15 @@ export function Toolbar() {
             <ShieldCheck className="size-4" />
           )}
         </Tool>
-        <Tool
-          label="Minimap"
-          pressed={minimapOpen}
-          onClick={() => useCanvasUi.getState().toggleMinimap()}
-        >
-          <MapIcon className="size-4" />
-        </Tool>
+        <span className="hidden sm:inline-flex">
+          <Tool
+            label="Minimap"
+            pressed={minimapOpen}
+            onClick={() => useCanvasUi.getState().toggleMinimap()}
+          >
+            <MapIcon className="size-4" />
+          </Tool>
+        </span>
         <Tool
           label="Tour architecture flow (W)"
           onClick={() => useCanvasUi.getState().startWalkthrough()}
