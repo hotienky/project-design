@@ -36,6 +36,12 @@ export const NODE_KINDS = [
   "queue",
   "actor",
   "note",
+  // Game design (overview.mode "game"); valid in any document.
+  "loop",
+  "system",
+  "mechanic",
+  "resource",
+  "content",
 ] as const;
 export type NodeKind = (typeof NODE_KINDS)[number];
 
@@ -49,6 +55,12 @@ export const EDGE_KINDS = [
   "uses",
   "relation",
   "interacts",
+  // Game design
+  "drives",
+  "produces",
+  "consumes",
+  "triggers",
+  "modifies",
 ] as const;
 export type EdgeKind = (typeof EDGE_KINDS)[number];
 
@@ -133,6 +145,25 @@ export const PatternUseSchema = z.object({
   name: z.string().trim().min(1).max(80),
   notes: Text(2000),
 });
+
+/** A named value: a tuning parameter, a design parameter or a quality target. */
+export const ParameterSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  value: Short(200),
+  unit: Short(40),
+  notes: Text(1000),
+});
+export type Parameter = z.output<typeof ParameterSchema>;
+
+/** A rule written as a formula, e.g. "D_final = D_raw × 100 / (100 + A)". */
+export const FormulaSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  expression: z.string().trim().min(1).max(500),
+  notes: Text(1000),
+});
+export type Formula = z.output<typeof FormulaSchema>;
+
+export const GAME_PRIORITIES = ["mvp", "launch", "later"] as const;
 
 // ── Nodes ───────────────────────────────────────────────────────────────────
 
@@ -294,6 +325,100 @@ export const NoteDataSchema = z.object({
   color: z.enum(["yellow", "blue", "green", "pink", "gray"]).default("yellow"),
 });
 
+export const GAME_SYSTEM_CATEGORIES = [
+  "core",
+  "combat",
+  "character",
+  "abilities",
+  "items",
+  "progression",
+  "ai",
+  "world",
+  "multiplayer",
+  "economy",
+  "ui",
+  "audio-visual",
+  "meta",
+  "tech",
+  "other",
+] as const;
+
+export const LoopDataSchema = z.object({
+  /** How long one turn of the loop takes, e.g. "5–30 seconds". */
+  duration: Short(80),
+  motivation: Text(2000),
+  /** The beats of the loop in order. */
+  steps: z.array(Line).max(30).default([]),
+});
+
+const DesignRules = {
+  rules: z.array(Line).max(50).default([]),
+  parameters: z.array(ParameterSchema).max(100).default([]),
+  formulas: z.array(FormulaSchema).max(30).default([]),
+  priority: z.enum(GAME_PRIORITIES).default("mvp"),
+};
+
+export const SystemDataSchema = z.object({
+  category: z.enum(GAME_SYSTEM_CATEGORIES).default("core"),
+  purpose: Text(2000),
+  /** Who owns the system's state in multiplayer. */
+  authority: z
+    .enum(["unspecified", "server", "client", "backend", "shared"])
+    .default("unspecified"),
+  ...DesignRules,
+});
+
+export const MechanicDataSchema = z.object({
+  /** What starts it, e.g. "Space / B button", "enemy killed". */
+  trigger: Short(200),
+  /** States or phases in order, e.g. Startup → Active → Recovery. */
+  states: z.array(Line).max(30).default([]),
+  ...DesignRules,
+});
+
+export const RESOURCE_TYPES = [
+  "stat",
+  "attribute",
+  "currency",
+  "material",
+  "item",
+  "experience",
+  "other",
+] as const;
+
+export const ResourceDataSchema = z.object({
+  type: z.enum(RESOURCE_TYPES).default("stat"),
+  initial: Short(60),
+  min: Short(60),
+  max: Short(60),
+  /** Passive regeneration or decay, e.g. "20/s after 1 s delay". */
+  regen: Short(200),
+});
+
+export const CONTENT_TYPES = [
+  "character",
+  "class",
+  "enemy",
+  "boss",
+  "item",
+  "ability",
+  "level",
+  "quest",
+  "table",
+  "other",
+] as const;
+
+export const ContentDataSchema = z.object({
+  type: z.enum(CONTENT_TYPES).default("table"),
+  /** A table of content definitions: column headers and rows of cells. */
+  columns: z.array(z.string().trim().min(1).max(60)).max(12).default([]),
+  rows: z
+    .array(z.array(z.string().max(500)).max(12))
+    .max(200)
+    .default([]),
+  priority: z.enum(GAME_PRIORITIES).default("mvp"),
+});
+
 // Every data schema below has a default for every field, so `{}` is a valid input.
 const node = <K extends NodeKind, D extends z.ZodObject>(kind: K, data: D) =>
   NodeBase.extend({ kind: z.literal(kind), data: data.prefault({} as z.input<D>) });
@@ -308,6 +433,11 @@ export const IntegrationNodeSchema = node("integration", IntegrationDataSchema);
 export const QueueNodeSchema = node("queue", QueueDataSchema);
 export const ActorNodeSchema = node("actor", ActorDataSchema);
 export const NoteNodeSchema = node("note", NoteDataSchema);
+export const LoopNodeSchema = node("loop", LoopDataSchema);
+export const SystemNodeSchema = node("system", SystemDataSchema);
+export const MechanicNodeSchema = node("mechanic", MechanicDataSchema);
+export const ResourceNodeSchema = node("resource", ResourceDataSchema);
+export const ContentNodeSchema = node("content", ContentDataSchema);
 
 export const NodeSchema = z.discriminatedUnion("kind", [
   ServiceNodeSchema,
@@ -320,6 +450,11 @@ export const NodeSchema = z.discriminatedUnion("kind", [
   QueueNodeSchema,
   ActorNodeSchema,
   NoteNodeSchema,
+  LoopNodeSchema,
+  SystemNodeSchema,
+  MechanicNodeSchema,
+  ResourceNodeSchema,
+  ContentNodeSchema,
 ]);
 export type DesignNode = z.output<typeof NodeSchema>;
 export type NodeOfKind<K extends NodeKind> = Extract<DesignNode, { kind: K }>;
@@ -374,6 +509,11 @@ export const EdgeSchema = z.discriminatedUnion("kind", [
     }),
   ),
   edge("interacts", z.object({ via: Short(120) })),
+  edge("drives", z.object({})),
+  edge("produces", z.object({ rate: Short(200) })),
+  edge("consumes", z.object({ amount: Short(200) })),
+  edge("triggers", z.object({ event: Short(200) })),
+  edge("modifies", z.object({ effect: Short(200) })),
 ]);
 export type DesignEdge = z.output<typeof EdgeSchema>;
 export type EdgeOfKind<K extends EdgeKind> = Extract<DesignEdge, { kind: K }>;
@@ -445,7 +585,41 @@ export const DecisionSchema = z.object({
 });
 export type Decision = z.output<typeof DecisionSchema>;
 
+export const MilestoneSchema = z.object({
+  id: IdSchema,
+  title: z.string().trim().min(1).max(200),
+  /** Free text, e.g. "Weeks 1–3" or "Q1 2027". */
+  timeframe: Short(80),
+  deliverables: z.array(Line).max(50).default([]),
+  exitCriteria: Text(2000),
+  /** Node ids built in this milestone; empty = not tied to components. */
+  scope: z.array(IdSchema).max(100).default([]),
+});
+export type Milestone = z.output<typeof MilestoneSchema>;
+
+export const DESIGN_MODES = ["software", "game"] as const;
+export type DesignMode = (typeof DESIGN_MODES)[number];
+
+export const GameOverviewSchema = z.object({
+  genre: Short(120),
+  engine: Short(80),
+  platforms: z.array(z.string().trim().min(1).max(60)).max(20).default([]),
+  /** Design pillars: the principles every system must serve. */
+  pillars: z.array(Line).max(20).default([]),
+  /** Design parameters: players, camera, session length, monetization… */
+  parameters: z.array(ParameterSchema).max(50).default([]),
+  /** Reference games and what to take from each. */
+  references: z
+    .array(z.object({ name: z.string().trim().min(1).max(80), takeaway: Text(500) }))
+    .max(20)
+    .default([]),
+  /** Performance and quality targets, e.g. 60 FPS, 30 Hz server tick. */
+  targets: z.array(ParameterSchema).max(30).default([]),
+});
+
 export const OverviewSchema = z.object({
+  /** "game" switches the designer to game systems (loops, systems, mechanics, resources). */
+  mode: z.enum(DESIGN_MODES).default("software"),
   summary: Text(),
   goals: z.array(Line).max(50).default([]),
   nonGoals: z.array(Line).max(50).default([]),
@@ -458,6 +632,7 @@ export const OverviewSchema = z.object({
       notes: Text(4000),
     })
     .prefault({}),
+  game: GameOverviewSchema.prefault({}),
 });
 
 // ── Document ────────────────────────────────────────────────────────────────
@@ -468,6 +643,7 @@ export const DesignDocumentSchema = z.object({
   stack: z.array(StackItemSchema).max(200).default([]),
   conventions: z.array(ConventionSchema).max(300).default([]),
   decisions: z.array(DecisionSchema).max(200).default([]),
+  milestones: z.array(MilestoneSchema).max(100).default([]),
   nodes: z.array(NodeSchema).max(2_000).default([]),
   edges: z.array(EdgeSchema).max(5_000).default([]),
 });

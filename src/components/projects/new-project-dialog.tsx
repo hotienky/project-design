@@ -23,7 +23,7 @@ export function NewProjectDialog() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [template, setTemplate] = useState<"blank" | "example">("blank");
+  const [template, setTemplate] = useState<"blank" | "example" | "game" | "game-example">("blank");
   const [pending, startTransition] = useTransition();
 
   function submit(event: React.FormEvent) {
@@ -72,8 +72,10 @@ export function NewProjectDialog() {
             <legend className="mb-1 text-sm font-medium">Start from</legend>
             {(
               [
-                ["blank", "Blank"],
+                ["blank", "Blank software project"],
+                ["game", "Blank game design"],
                 ["example", "Example: Team Tasks"],
+                ["game-example", "Example: Ashen Realms (game)"],
               ] as const
             ).map(([value, label]) => (
               <label key={value} className="flex items-center gap-2 text-sm">

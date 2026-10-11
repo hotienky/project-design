@@ -11,6 +11,7 @@ import type {
   EnvVar,
   Field,
   NodeOfKind,
+  Parameter,
   TypeShape,
 } from "@/lib/design/schema";
 import type { ComponentStatus } from "@/lib/design/status";
@@ -61,6 +62,13 @@ const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 const yesNo = (b: boolean) => (b ? "yes" : "no");
 
 const TOP_LEVEL_ORDER = ["service", "datastore", "api", "queue", "integration", "actor"] as const;
+const GAME_ORDER = ["loop", "system", "resource", "content"] as const;
+
+/** "Dodge cost = 25 stamina (notes)" */
+const formatParameter = (p: Parameter) =>
+  `${p.name}${p.value ? ` = ${p.value}${p.unit ? ` ${p.unit}` : ""}` : ""}${
+    p.notes.trim() ? ` (${oneLine(p.notes)})` : ""
+  }`;
 const CARDINALITY_LABEL = { "one-to-one": "1—1", "one-to-many": "1—N", "many-to-many": "N—N" };
 
 // ── Renderer ────────────────────────────────────────────────────────────────
@@ -104,6 +112,52 @@ export function renderBrief(input: BriefInput): string {
     `**Repository:** ${repo}${o.repository.notes.trim() ? ` — ${oneLine(o.repository.notes)}` : ""}`,
   );
   out.push("## Overview", "", ...overview, "");
+
+  // Game vision (game mode only)
+  if (o.mode === "game") {
+    const g = o.game;
+    const vision: string[] = [];
+    const facts = [
+      g.genre && `**Genre:** ${g.genre}`,
+      g.engine && `**Engine:** ${g.engine}`,
+      g.platforms.length > 0 && `**Platforms:** ${g.platforms.join(", ")}`,
+    ].filter(Boolean) as string[];
+    if (facts.length > 0) vision.push(facts.join(" · "), "");
+    if (g.pillars.length > 0)
+      vision.push("**Design pillars**", ...g.pillars.map((p) => `- ${p}`), "");
+    if (g.parameters.length > 0) {
+      vision.push(
+        "**Design parameters**",
+        "",
+        ...table(
+          ["Parameter", "Value", "Notes"],
+          g.parameters.map((p) => [p.name, [p.value, p.unit].filter(Boolean).join(" "), p.notes]),
+        ),
+        "",
+      );
+    }
+    if (g.references.length > 0) {
+      vision.push(
+        "**References**",
+        ...g.references.map(
+          (r) => `- ${r.name}${r.takeaway.trim() ? `: ${oneLine(r.takeaway)}` : ""}`,
+        ),
+        "",
+      );
+    }
+    if (g.targets.length > 0) {
+      vision.push(
+        "**Targets**",
+        "",
+        ...table(
+          ["Target", "Value", "Notes"],
+          g.targets.map((p) => [p.name, [p.value, p.unit].filter(Boolean).join(" "), p.notes]),
+        ),
+        "",
+      );
+    }
+    section("Game vision", vision.slice(0, -1));
+  }
 
   // Tech stack
   section(
@@ -164,7 +218,9 @@ export function renderBrief(input: BriefInput): string {
     for (const child of index.children(n.id))
       if (child.kind !== "note") renderNode(child, depth + 1);
   };
-  for (const kind of TOP_LEVEL_ORDER) {
+  const order =
+    o.mode === "game" ? [...GAME_ORDER, ...TOP_LEVEL_ORDER] : [...TOP_LEVEL_ORDER, ...GAME_ORDER];
+  for (const kind of order) {
     for (const n of index.children(null)) if (n.kind === kind) renderNode(n, 0);
   }
   out.push(
@@ -173,6 +229,59 @@ export function renderBrief(input: BriefInput): string {
     ...(components.length > 0 ? components : ["_No components yet._"]),
     "",
   );
+
+  // Economy: every resource with its sources and sinks
+  const resources = doc.nodes.filter((n) => n.kind === "resource");
+  const flow = (id: string, kind: "produces" | "consumes") =>
+    index
+      .incoming(id, kind)
+      .map((e) => {
+        const detail =
+          e.kind === "produces" ? e.data.rate : e.kind === "consumes" ? e.data.amount : "";
+        return `${name(e.source)}${detail ? ` (${detail})` : ""}`;
+      })
+      .join(", ");
+  section(
+    "Economy",
+    resources.length === 0
+      ? []
+      : table(
+          ["Resource", "Type", "Initial", "Range", "Regen", "Sources", "Sinks"],
+          resources.map((r) => [
+            `${r.name} [${r.id}]`,
+            r.data.type,
+            r.data.initial,
+            [r.data.min, r.data.max].some(Boolean)
+              ? `${r.data.min || "—"}…${r.data.max || "—"}`
+              : "",
+            r.data.regen,
+            flow(r.id, "produces") || "—",
+            flow(r.id, "consumes") || "—",
+          ]),
+        ),
+  );
+
+  // Content tables
+  const contents: string[] = [];
+  for (const n of doc.nodes) {
+    if (n.kind !== "content") continue;
+    contents.push(
+      `### ${n.name} [${n.id}] — ${n.data.type}${n.parentId ? ` · in ${name(n.parentId)}` : ""}`,
+      "",
+    );
+    if (n.description.trim()) contents.push(oneLine(n.description), "");
+    if (n.data.columns.length > 0) {
+      const width = n.data.columns.length;
+      contents.push(
+        ...table(
+          n.data.columns,
+          n.data.rows.map((r) => Array.from({ length: width }, (_, i) => r[i] ?? "")),
+        ),
+      );
+    } else contents.push("_No columns yet._");
+    contents.push("");
+  }
+  if (contents.length > 0) section("Content tables", contents.slice(0, -1));
 
   // Data model
   const model = dataModel(index);
@@ -372,6 +481,17 @@ export function renderBrief(input: BriefInput): string {
   }
   if (decisions.length > 0) section("Decisions", decisions.slice(0, -1));
 
+  // Roadmap
+  const roadmap: string[] = [];
+  for (const m of doc.milestones) {
+    roadmap.push(`### [${m.id}] ${m.title}${m.timeframe ? ` — ${m.timeframe}` : ""}`, "");
+    roadmap.push(...m.deliverables.map((d) => `- ${d}`));
+    if (m.exitCriteria.trim()) roadmap.push(`- **Exit criteria:** ${oneLine(m.exitCriteria)}`);
+    if (m.scope.length > 0) roadmap.push(`- **Builds:** ${names(m.scope)}`);
+    roadmap.push("");
+  }
+  if (roadmap.length > 0) section("Roadmap", roadmap.slice(0, -1));
+
   // Notes
   section(
     "Notes",
@@ -422,6 +542,26 @@ function nodeFacts(n: DesignNode): string[] {
       return [n.data.technology, count(n.data.channels.length, "channel")];
     case "actor":
       return [n.data.type];
+    case "loop":
+      return n.data.duration ? [n.data.duration] : [];
+    case "system":
+      return [
+        n.data.category,
+        n.data.authority !== "unspecified" && `${n.data.authority}-authoritative`,
+        `priority ${n.data.priority}`,
+      ].filter(Boolean) as string[];
+    case "mechanic":
+      return [n.data.trigger && `trigger: ${n.data.trigger}`, `priority ${n.data.priority}`].filter(
+        Boolean,
+      ) as string[];
+    case "resource":
+      return [
+        n.data.type,
+        n.data.initial && `initial ${n.data.initial}`,
+        n.data.regen && `regen ${n.data.regen}`,
+      ].filter(Boolean) as string[];
+    case "content":
+      return [n.data.type, count(n.data.rows.length, "row"), `priority ${n.data.priority}`];
     default:
       return [];
   }
@@ -437,6 +577,35 @@ function nodeLists(n: DesignNode): string[] {
     lines.push(`Rules: ${n.data.rules.join("; ")}`);
   if (n.kind === "module" && n.data.exports.length > 0) {
     lines.push(`Exports: ${n.data.exports.map((e) => `\`${e}\``).join(", ")}`);
+  }
+  if (n.kind === "loop") {
+    if (n.data.motivation.trim()) lines.push(`Motivation: ${oneLine(n.data.motivation)}`);
+    if (n.data.steps.length > 0) lines.push(`Steps: ${n.data.steps.join(" → ")}`);
+  }
+  if (n.kind === "system" && n.data.purpose.trim())
+    lines.push(`Purpose: ${oneLine(n.data.purpose)}`);
+  if (n.kind === "mechanic" && n.data.states.length > 0) {
+    lines.push(`States: ${n.data.states.join(" → ")}`);
+  }
+  if (n.kind === "system" || n.kind === "mechanic") {
+    if (n.data.rules.length > 0) lines.push(`Rules: ${n.data.rules.join("; ")}`);
+    if (n.data.parameters.length > 0) {
+      lines.push(`Parameters: ${n.data.parameters.map(formatParameter).join("; ")}`);
+    }
+    for (const f of n.data.formulas) {
+      lines.push(
+        `Formula ${f.name}: \`${f.expression}\`${f.notes.trim() ? ` — ${oneLine(f.notes)}` : ""}`,
+      );
+    }
+  }
+  if (n.kind === "resource") {
+    const range = [n.data.min && `min ${n.data.min}`, n.data.max && `max ${n.data.max}`].filter(
+      Boolean,
+    );
+    if (range.length > 0) lines.push(`Range: ${range.join(", ")}`);
+  }
+  if (n.kind === "content" && n.data.columns.length > 0) {
+    lines.push(`Columns: ${n.data.columns.join(" | ")} (rows under Content tables)`);
   }
   return lines;
 }
@@ -499,6 +668,34 @@ function nodeRelations(index: DesignIndex, n: DesignNode): string[] {
       index
         .outgoing(n.id, "uses")
         .map((e) => `${name(e.target)}${e.data.purpose ? ` (${oneLine(e.data.purpose)})` : ""}`),
+    ),
+    group(
+      "Drives",
+      index.outgoing(n.id, "drives").map((e) => name(e.target)),
+    ),
+    group(
+      "Produces",
+      index
+        .outgoing(n.id, "produces")
+        .map((e) => `${name(e.target)}${e.data.rate ? ` (${e.data.rate})` : ""}`),
+    ),
+    group(
+      "Consumes",
+      index
+        .outgoing(n.id, "consumes")
+        .map((e) => `${name(e.target)}${e.data.amount ? ` (${e.data.amount})` : ""}`),
+    ),
+    group(
+      "Triggers",
+      index
+        .outgoing(n.id, "triggers")
+        .map((e) => `${name(e.target)}${e.data.event ? ` on ${e.data.event}` : ""}`),
+    ),
+    group(
+      "Modifies",
+      index
+        .outgoing(n.id, "modifies")
+        .map((e) => `${name(e.target)}${e.data.effect ? ` (${e.data.effect})` : ""}`),
     ),
   ].filter(Boolean);
 }

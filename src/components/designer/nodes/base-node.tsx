@@ -6,9 +6,12 @@ import {
   GripVertical,
   KeyRound,
   ListChecks,
+  ListOrdered,
   PackageOpen,
+  Rows3,
   Ruler,
   Shapes,
+  SlidersHorizontal,
   StickyNote,
   Tag,
   Target,
@@ -85,6 +88,24 @@ function subtitleOf(n: DesignNode): string {
       return `${n.data.technology} · ${n.data.channels.length} channels`;
     case "actor":
       return n.data.type;
+    case "loop":
+      return n.data.duration;
+    case "system":
+      return [
+        n.data.category,
+        n.data.priority !== "mvp" && n.data.priority,
+        n.data.authority !== "unspecified" && n.data.authority,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    case "mechanic":
+      return n.data.trigger || n.data.states.join(" → ");
+    case "resource":
+      return [n.data.type, n.data.initial && `${n.data.initial}`, n.data.max && `max ${n.data.max}`]
+        .filter(Boolean)
+        .join(" · ");
+    case "content":
+      return `${n.data.type} · ${n.data.rows.length} rows`;
     default:
       return "";
   }
@@ -98,6 +119,9 @@ const METRIC_ICON: Record<CardMetric["key"], LucideIcon> = {
   goals: Target,
   patterns: Shapes,
   tags: Tag,
+  parameters: SlidersHorizontal,
+  steps: ListOrdered,
+  rows: Rows3,
 };
 
 export const chip =

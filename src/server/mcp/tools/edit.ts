@@ -22,8 +22,11 @@ import {
   CONVENTION_CATEGORIES,
   ConventionSchema,
   DecisionSchema,
+  DESIGN_MODES,
   EDGE_KINDS,
   EdgeSchema,
+  GameOverviewSchema,
+  MilestoneSchema,
   NODE_KINDS,
   NodeSchema,
   STACK_CATEGORIES,
@@ -62,6 +65,7 @@ const SECTIONS = {
   stack: { schema: StackItemSchema, prefix: "stk" },
   conventions: { schema: ConventionSchema, prefix: "cnv" },
   decisions: { schema: DecisionSchema, prefix: "adr" },
+  milestones: { schema: MilestoneSchema, prefix: "ms" },
 } as const;
 type Section = keyof typeof SECTIONS;
 const SectionArg = z.enum(Object.keys(SECTIONS) as [Section, ...Section[]]);
@@ -265,7 +269,7 @@ export function registerEditTools(server: McpServer, ctx: McpContext) {
     {
       title: "Remove components",
       description:
-        "Remove components from the draft, with everything nested inside them and every connection to them. Stack and convention scopes and entity references to them are cleared.",
+        "Remove components from the draft, with everything nested inside them and every connection to them. Stack, convention and milestone scopes and entity references to them are cleared.",
       inputSchema: z.object({
         project: ProjectArg,
         ids: z.array(ComponentRef).min(1).describe("Component ids or exact names."),
@@ -403,9 +407,13 @@ export function registerEditTools(server: McpServer, ctx: McpContext) {
     {
       title: "Update the overview",
       description:
-        "Change the project overview in the draft: summary, goals, non-goals, architecture style and notes, repository layout. Only the fields you pass change; lists are replaced.",
+        "Change the project overview in the draft: design mode (software or game), summary, goals, non-goals, architecture style and notes, repository layout, and the game vision (genre, engine, platforms, pillars, parameters, references, targets). Only the fields you pass change; lists are replaced.",
       inputSchema: z.object({
         project: ProjectArg,
+        mode: z
+          .enum(DESIGN_MODES)
+          .optional()
+          .describe("game switches the designer to game systems (loops, systems, mechanics…)."),
         summary: z.string().optional(),
         goals: z.array(z.string()).optional(),
         nonGoals: z.array(z.string()).optional(),
@@ -418,10 +426,18 @@ export function registerEditTools(server: McpServer, ctx: McpContext) {
             notes: z.string().optional(),
           })
           .optional(),
+        game: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe(
+            "Game vision fields to change: genre, engine, platforms[], pillars[], " +
+              "parameters[{ name, value, unit?, notes? }], references[{ name, takeaway }], " +
+              "targets[{ name, value, unit?, notes? }].",
+          ),
       }),
       annotations: { ...WRITE, idempotentHint: true },
     },
-    guarded(async ({ project, repository, ...fields }) => {
+    guarded(async ({ project, repository, game, ...fields }) => {
       const defined = <T extends object>(o: T) =>
         Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
       const saved = await editDraft(ctx, project, (doc) => {
@@ -429,7 +445,13 @@ export function registerEditTools(server: McpServer, ctx: McpContext) {
           ...doc.overview,
           ...defined(fields),
           repository: { ...doc.overview.repository, ...defined(repository ?? {}) },
+          game: doc.overview.game,
         };
+        if (game) {
+          const parsed = GameOverviewSchema.safeParse({ ...doc.overview.game, ...game });
+          if (!parsed.success) throw invalid("game", parsed.error);
+          overview.game = parsed.data;
+        }
         return { document: { ...doc, overview }, result: {} };
       });
       return jsonResult(saved);
@@ -439,12 +461,13 @@ export function registerEditTools(server: McpServer, ctx: McpContext) {
   server.registerTool(
     "upsert_section_items",
     {
-      title: "Add or change stack, conventions or decisions",
+      title: "Add or change stack, conventions, decisions or milestones",
       description:
         "Add or change items in a project-wide section of the draft. An item with an existing id is merged into it; an item without id is added. " +
         `stack: { category (${STACK_CATEGORIES.join(", ")}), name, version?, notes?, scope? }. ` +
         `conventions: { category (${CONVENTION_CATEGORIES.join(", ")}), level? (must, should, may), rule, scope? }. ` +
         "decisions: { title, status? (proposed, accepted, deprecated, superseded), context?, decision?, consequences?, date? (YYYY-MM-DD) }. " +
+        "milestones (the roadmap, in order): { title, timeframe?, deliverables?, exitCriteria?, scope? }. " +
         "scope lists component ids or exact names the item applies to; empty means the whole project.",
       inputSchema: z.object({
         project: ProjectArg,
@@ -486,7 +509,7 @@ export function registerEditTools(server: McpServer, ctx: McpContext) {
   server.registerTool(
     "remove_section_items",
     {
-      title: "Remove stack, conventions or decisions",
+      title: "Remove stack, conventions, decisions or milestones",
       description: "Remove items from a project-wide section of the draft by id.",
       inputSchema: z.object({
         project: ProjectArg,

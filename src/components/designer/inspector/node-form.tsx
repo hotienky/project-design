@@ -17,13 +17,23 @@ import {
   ACTOR_TYPES,
   API_AUTH,
   API_STYLES,
+  CONTENT_TYPE_OPTIONS,
   DATASTORE_ENGINES,
+  GAME_PRIORITY_OPTIONS,
+  GAME_SYSTEM_CATEGORY_OPTIONS,
   INTEGRATION_CATEGORIES,
   NOTE_COLOR_NAMES,
   QUEUE_TECHNOLOGIES,
+  RESOURCE_TYPE_OPTIONS,
   SERVICE_TYPES,
+  SYSTEM_AUTHORITIES,
 } from "@/components/designer/inspector/options";
 import { OperationsEditor } from "@/components/designer/inspector/operations-editor";
+import { ContentTableEditor } from "@/components/designer/inspector/content-table-editor";
+import {
+  FormulasEditor,
+  ParametersEditor,
+} from "@/components/designer/inspector/parameters-editor";
 import { PatternsPicker } from "@/components/designer/inspector/patterns-picker";
 import { StringList } from "@/components/designer/inspector/string-list";
 import { TagsInput } from "@/components/designer/inspector/tags-input";
@@ -417,6 +427,191 @@ export function NodeForm({ node }: { node: DesignNode }) {
               label="Goals"
               items={node.data.goals}
               onChange={(goals) => setData({ goals })}
+            />
+          </>
+        )}
+        {node.kind === "loop" && (
+          <>
+            <TextField
+              label="Duration"
+              value={node.data.duration}
+              placeholder="5–30 seconds"
+              validate={shortText(80)}
+              onCommit={(duration) => setData({ duration })}
+            />
+            <TextField
+              label="Motivation"
+              multiline
+              value={node.data.motivation}
+              validate={shortText(2000)}
+              onCommit={(motivation) => setData({ motivation })}
+            />
+            <StringList
+              label="Steps"
+              items={node.data.steps}
+              onChange={(steps) => setData({ steps })}
+            />
+          </>
+        )}
+        {node.kind === "system" && (
+          <>
+            <SelectField
+              label="Category"
+              value={node.data.category}
+              options={GAME_SYSTEM_CATEGORY_OPTIONS}
+              onChange={(category) => setData({ category })}
+            />
+            <TextField
+              label="Purpose"
+              multiline
+              value={node.data.purpose}
+              validate={shortText(2000)}
+              onCommit={(purpose) => setData({ purpose })}
+            />
+            <SelectField
+              label="Authority"
+              value={node.data.authority}
+              options={SYSTEM_AUTHORITIES}
+              hint="Who owns this system's state in multiplayer."
+              onChange={(authority) => setData({ authority })}
+            />
+            <SelectField
+              label="Priority"
+              value={node.data.priority}
+              options={GAME_PRIORITY_OPTIONS}
+              onChange={(priority) => setData({ priority })}
+            />
+            <StringList
+              label="Rules"
+              items={node.data.rules}
+              onChange={(rules) => setData({ rules })}
+            />
+            <ParametersEditor
+              label="Tuning parameters"
+              parameters={node.data.parameters}
+              onChange={(parameters) => setData({ parameters })}
+            />
+            <FormulasEditor
+              formulas={node.data.formulas}
+              onChange={(formulas) => setData({ formulas })}
+            />
+          </>
+        )}
+        {node.kind === "mechanic" && (
+          <>
+            <TextField
+              label="Trigger"
+              value={node.data.trigger}
+              placeholder="Space / B button, enemy killed…"
+              validate={shortText(200)}
+              onCommit={(trigger) => setData({ trigger })}
+            />
+            <StringList
+              label="States"
+              items={node.data.states}
+              onChange={(states) => setData({ states })}
+            />
+            <StringList
+              label="Rules"
+              items={node.data.rules}
+              onChange={(rules) => setData({ rules })}
+            />
+            <ParametersEditor
+              label="Tuning parameters"
+              parameters={node.data.parameters}
+              onChange={(parameters) => setData({ parameters })}
+            />
+            <FormulasEditor
+              formulas={node.data.formulas}
+              onChange={(formulas) => setData({ formulas })}
+            />
+            <SelectField
+              label="Priority"
+              value={node.data.priority}
+              options={GAME_PRIORITY_OPTIONS}
+              onChange={(priority) => setData({ priority })}
+            />
+          </>
+        )}
+        {node.kind === "resource" && (
+          <>
+            <SelectField
+              label="Type"
+              value={node.data.type}
+              options={RESOURCE_TYPE_OPTIONS}
+              onChange={(type) => setData({ type })}
+            />
+            <TextField
+              label="Initial"
+              value={node.data.initial}
+              validate={shortText(60)}
+              onCommit={(initial) => setData({ initial })}
+            />
+            <TextField
+              label="Min"
+              value={node.data.min}
+              validate={shortText(60)}
+              onCommit={(min) => setData({ min })}
+            />
+            <TextField
+              label="Max"
+              value={node.data.max}
+              validate={shortText(60)}
+              onCommit={(max) => setData({ max })}
+            />
+            <TextField
+              label="Regen"
+              value={node.data.regen}
+              placeholder="20/s after 1 s delay"
+              validate={shortText(200)}
+              onCommit={(regen) => setData({ regen })}
+            />
+            <Field
+              label="Sources"
+              hint="Draw a “produces” connection from a system or mechanic to this resource."
+            >
+              <ul className="text-sm">
+                {index.incoming(node.id, "produces").map((e) => (
+                  <li key={e.id}>{index.node(e.source)?.name}</li>
+                ))}
+                {index.incoming(node.id, "produces").length === 0 && (
+                  <li className="text-muted-foreground">None</li>
+                )}
+              </ul>
+            </Field>
+            <Field
+              label="Sinks"
+              hint="Draw a “consumes” connection from a system or mechanic to this resource."
+            >
+              <ul className="text-sm">
+                {index.incoming(node.id, "consumes").map((e) => (
+                  <li key={e.id}>{index.node(e.source)?.name}</li>
+                ))}
+                {index.incoming(node.id, "consumes").length === 0 && (
+                  <li className="text-muted-foreground">None</li>
+                )}
+              </ul>
+            </Field>
+          </>
+        )}
+        {node.kind === "content" && (
+          <>
+            <SelectField
+              label="Type"
+              value={node.data.type}
+              options={CONTENT_TYPE_OPTIONS}
+              onChange={(type) => setData({ type })}
+            />
+            <SelectField
+              label="Priority"
+              value={node.data.priority}
+              options={GAME_PRIORITY_OPTIONS}
+              onChange={(priority) => setData({ priority })}
+            />
+            <ContentTableEditor
+              columns={node.data.columns}
+              rows={node.data.rows}
+              onChange={(table) => setData(table)}
             />
           </>
         )}

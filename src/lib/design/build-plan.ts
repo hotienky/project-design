@@ -1,7 +1,7 @@
 /** Dependency-ordered implementation steps for a design (what to build first). */
 import type { DesignIndex } from "@/lib/design/graph";
 import type { ComponentStatus } from "@/lib/design/status";
-import type { DesignNode, NodeKind } from "@/lib/design/schema";
+import type { DesignNode, EdgeKind, NodeKind } from "@/lib/design/schema";
 
 export interface BuildStep {
   order: number; // 1-based
@@ -25,14 +25,28 @@ const KIND_PRIORITY: Partial<Record<NodeKind, number>> = {
   service: 5,
   layer: 6,
   module: 7,
+  resource: 1,
+  content: 2,
+  system: 5,
+  mechanic: 7,
 };
+
+/** Design context only: nothing to build. */
+const CONTEXT_KINDS: ReadonlySet<NodeKind> = new Set(["actor", "note", "loop"]);
+/** Edges that describe runtime or gameplay flow, not what must exist first. */
+const NO_ORDER_EDGES: ReadonlySet<EdgeKind> = new Set([
+  "relation",
+  "interacts",
+  "drives",
+  "triggers",
+]);
 
 export function buildPlan(
   index: DesignIndex,
   statuses?: Map<string, ComponentStatus>,
 ): BuildStep[] {
   const { doc } = index;
-  const candidates = doc.nodes.filter((n) => n.kind !== "actor" && n.kind !== "note");
+  const candidates = doc.nodes.filter((n) => !CONTEXT_KINDS.has(n.kind));
   const ids = new Set(candidates.map((n) => n.id));
   const docOrder = new Map(candidates.map((n, i) => [n.id, i]));
 
@@ -43,7 +57,7 @@ export function buildPlan(
   };
 
   for (const e of doc.edges) {
-    if (e.kind === "relation" || e.kind === "interacts") continue;
+    if (NO_ORDER_EDGES.has(e.kind)) continue;
     needs(e.target, e.source); // the target of depends_on/calls/exposes/accesses/… comes first
   }
   for (const n of candidates) {
@@ -168,6 +182,10 @@ function titleFor(n: DesignNode): string {
       return `Scaffold ${n.name}`;
     case "layer":
       return `Create ${n.name} layer`;
+    case "resource":
+      return `Define ${n.name}`;
+    case "content":
+      return `Author ${n.name}`;
     default:
       return `Implement ${n.name}`;
   }
@@ -221,6 +239,25 @@ function instructionFor(index: DesignIndex, n: DesignNode): string {
     }
     case "module":
       return `Implement ${n.name} in ${n.data.path || index.path(n.id)} exposing ${list(n.data.exports, "its responsibilities")}.`;
+    case "system": {
+      const parts = index.children(n.id).filter((c) => c.kind === "mechanic");
+      return `Implement the ${n.name} system as one feature module (${n.data.category}${
+        n.data.authority !== "unspecified" ? `, ${n.data.authority}-authoritative` : ""
+      }) with pure, tested domain logic; mechanics: ${list(
+        parts.map((c) => c.name),
+        "none yet",
+      )}.`;
+    }
+    case "mechanic":
+      return `Implement ${n.name}${n.data.trigger ? ` (trigger: ${n.data.trigger})` : ""} following its rules, parameters and formulas exactly.`;
+    case "resource":
+      return `Define the ${n.data.type} ${n.name}${
+        n.data.initial
+          ? ` (initial ${n.data.initial}${n.data.max ? `, max ${n.data.max}` : ""})`
+          : ""
+      } with its sources and sinks.`;
+    case "content":
+      return `Author ${n.name} as data assets with stable ids (${list(n.data.columns, "no columns yet")}).`;
     default:
       return `Implement ${n.name}.`;
   }

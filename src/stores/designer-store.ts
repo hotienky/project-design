@@ -34,7 +34,10 @@ import {
 } from "@/lib/design/schema";
 
 export type SaveStatus = "idle" | "saving" | "error" | "conflict";
-type Sections = Pick<DesignDocument, "overview" | "stack" | "conventions" | "decisions">;
+type Sections = Pick<
+  DesignDocument,
+  "overview" | "stack" | "conventions" | "decisions" | "milestones"
+>;
 
 export interface DesignerState {
   slug: string;

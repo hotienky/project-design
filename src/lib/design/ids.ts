@@ -21,10 +21,15 @@ export const NODE_ID_PREFIX: Record<NodeKind, string> = {
   queue: "que",
   actor: "act",
   note: "nte",
+  loop: "lop",
+  system: "sys",
+  mechanic: "mec",
+  resource: "res",
+  content: "cnt",
 };
 
 export const newNodeId = (kind: NodeKind) => `${NODE_ID_PREFIX[kind]}_${randomIdBody()}`;
 export const newEdgeId = (_kind?: EdgeKind) => `e_${randomIdBody()}`;
 /** Ids for list items inside a document: stack items, conventions, decisions, operations… */
-export const newItemId = (prefix: "stk" | "cnv" | "adr" | "op" | "ch") =>
+export const newItemId = (prefix: "stk" | "cnv" | "adr" | "op" | "ch" | "ms") =>
   `${prefix}_${randomIdBody(8)}`;

@@ -133,6 +133,41 @@ export function EdgeForm({ edge }: { edge: DesignEdge }) {
         {edge.kind === "depends_on" && (
           <p className="text-sm text-muted-foreground">No extra settings.</p>
         )}
+        {edge.kind === "drives" && (
+          <p className="text-sm text-muted-foreground">No extra settings.</p>
+        )}
+        {edge.kind === "produces" && (
+          <TextField
+            label="Rate"
+            placeholder="on kill, 20/s…"
+            value={edge.data.rate}
+            onCommit={(rate) => setData({ rate })}
+          />
+        )}
+        {edge.kind === "consumes" && (
+          <TextField
+            label="Amount"
+            placeholder="25 per dodge…"
+            value={edge.data.amount}
+            onCommit={(amount) => setData({ amount })}
+          />
+        )}
+        {edge.kind === "triggers" && (
+          <TextField
+            label="Event"
+            placeholder="enemy defeated…"
+            value={edge.data.event}
+            onCommit={(event) => setData({ event })}
+          />
+        )}
+        {edge.kind === "modifies" && (
+          <TextField
+            label="Effect"
+            placeholder="+armor, ×1.2 damage…"
+            value={edge.data.effect}
+            onCommit={(effect) => setData({ effect })}
+          />
+        )}
         {edge.kind === "exposes" && target?.kind === "api" && (
           <OperationsField
             api={target}
