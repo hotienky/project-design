@@ -16,7 +16,17 @@ export interface Rect extends Point {
 }
 
 export interface CardMetric {
-  key: "responsibilities" | "env" | "rules" | "exports" | "goals" | "patterns" | "tags";
+  key:
+    | "responsibilities"
+    | "env"
+    | "rules"
+    | "exports"
+    | "goals"
+    | "patterns"
+    | "tags"
+    | "parameters"
+    | "steps"
+    | "rows";
   value: number;
   label: string;
 }
@@ -54,6 +64,23 @@ export function cardMetrics(n: DesignNode): CardMetric[] {
       break;
     case "actor":
       own.push({ key: "goals", value: n.data.goals.length, label: "goals" });
+      break;
+    case "loop":
+      own.push({ key: "steps", value: n.data.steps.length, label: "steps" });
+      break;
+    case "system":
+    case "mechanic":
+      own.push(
+        { key: "rules", value: n.data.rules.length, label: "rules" },
+        {
+          key: "parameters",
+          value: n.data.parameters.length + n.data.formulas.length,
+          label: "parameters and formulas",
+        },
+      );
+      break;
+    case "content":
+      own.push({ key: "rows", value: n.data.rows.length, label: "rows" });
       break;
   }
   own.push(

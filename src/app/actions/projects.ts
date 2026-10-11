@@ -4,7 +4,9 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { ashenRealmsDesign } from "@/lib/design/examples/ashen-realms";
 import { teamTasksDesign } from "@/lib/design/examples/team-tasks";
+import type { DesignDocumentInput } from "@/lib/design/schema";
 import { fail, type ActionResult } from "@/app/actions/types";
 import { requirePrincipal } from "@/server/auth/current";
 import { getDb } from "@/server/db/client";
@@ -33,8 +35,23 @@ function invalid(error: z.ZodError): { ok: false; error: { code: string; message
 const CreateInput = z.object({
   name: Name,
   description: Description.default(""),
-  template: z.enum(["blank", "example"]).default("blank"),
+  template: z.enum(["blank", "example", "game", "game-example"]).default("blank"),
 });
+
+const BLANK_GAME_DESIGN: DesignDocumentInput = { schemaVersion: 1, overview: { mode: "game" } };
+
+function templateDocument(template: z.infer<typeof CreateInput>["template"]) {
+  switch (template) {
+    case "example":
+      return teamTasksDesign;
+    case "game":
+      return BLANK_GAME_DESIGN;
+    case "game-example":
+      return ashenRealmsDesign;
+    default:
+      return undefined;
+  }
+}
 
 /** Creates a project and navigates to it. Only returns when something went wrong. */
 export async function createProjectAction(input: unknown): Promise<ActionResult> {
@@ -47,7 +64,7 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
       ownerId: userId,
       name: parsed.data.name,
       description: parsed.data.description,
-      document: parsed.data.template === "example" ? teamTasksDesign : undefined,
+      document: templateDocument(parsed.data.template),
     });
     slug = project.slug;
   } catch (error) {

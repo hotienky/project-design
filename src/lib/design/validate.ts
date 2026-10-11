@@ -36,6 +36,7 @@ export function validateDesign(
   checkApis(index, add);
   checkData(index, add);
   checkMessaging(index, add);
+  checkGame(index, add);
   checkOverlaps(doc, layout, add);
 
   for (const n of doc.nodes) {
@@ -76,6 +77,66 @@ type Add = (
   message: string,
   refs?: { nodeId?: string; edgeId?: string },
 ) => void;
+
+/** Resources that accumulate: without a source or a sink the economy breaks. */
+const FLOWING_RESOURCES = new Set(["currency", "material", "experience", "item"]);
+
+function checkGame(index: DesignIndex, add: Add) {
+  const { doc } = index;
+  if (
+    doc.overview.mode === "game" &&
+    doc.nodes.length > 0 &&
+    !doc.nodes.some((n) => n.kind === "system")
+  ) {
+    add("info", "game.no_systems", "The game design has no game systems yet.");
+  }
+  for (const n of doc.nodes) {
+    if (n.kind === "loop" && index.outgoing(n.id, "drives").length === 0) {
+      add(
+        "warning",
+        "loop.drives_nothing",
+        `Gameplay loop "${n.name}" does not drive any system, mechanic or inner loop.`,
+        { nodeId: n.id },
+      );
+    }
+    if (n.kind === "resource" && FLOWING_RESOURCES.has(n.data.type)) {
+      if (index.incoming(n.id, "produces").length === 0) {
+        add(
+          "warning",
+          "resource.no_source",
+          `Resource "${n.name}" has no source: nothing produces it.`,
+          {
+            nodeId: n.id,
+          },
+        );
+      }
+      if (n.data.type !== "item" && index.incoming(n.id, "consumes").length === 0) {
+        add(
+          "warning",
+          "resource.no_sink",
+          `Resource "${n.name}" has no sink: nothing consumes it, so it will pile up.`,
+          { nodeId: n.id },
+        );
+      }
+    }
+    if (
+      n.kind === "system" &&
+      index.children(n.id).length === 0 &&
+      n.data.rules.length === 0 &&
+      !n.data.purpose.trim() &&
+      !n.description.trim()
+    ) {
+      add(
+        "info",
+        "system.empty",
+        `Game system "${n.name}" has no mechanics, rules or purpose yet.`,
+        {
+          nodeId: n.id,
+        },
+      );
+    }
+  }
+}
 
 function checkServices(doc: DesignDocument, add: Add) {
   const services = doc.nodes.filter((n) => n.kind === "service");
